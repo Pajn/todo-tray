@@ -8,6 +8,8 @@ use serde::Deserialize;
 pub struct TodoTask {
     pub id: String,
     pub content: String,
+    pub source: String,
+    pub can_complete: bool,
     pub due_datetime: Option<String>, // ISO 8601 format
     pub is_overdue: bool,
     pub is_today: bool,
@@ -18,33 +20,38 @@ pub struct TodoTask {
 impl TodoTask {
     pub fn from_todoist(task: TodoistTask) -> Self {
         let due_datetime = task.due.and_then(|d| parse_due_date(&d.date));
-
-        let is_overdue = due_datetime
-            .as_ref()
-            .map(|dt| dt < &Utc::now())
-            .unwrap_or(false);
-
-        let is_today = due_datetime
-            .as_ref()
-            .map(|dt| {
-                let today = Local::now().date_naive();
-                dt.with_timezone(&Local).date_naive() == today
-            })
-            .unwrap_or(false);
-
-        let is_tomorrow = due_datetime
-            .as_ref()
-            .map(|dt| {
-                let tomorrow = Local::now().date_naive() + chrono::Duration::days(1);
-                dt.with_timezone(&Local).date_naive() == tomorrow
-            })
-            .unwrap_or(false);
+        let (is_overdue, is_today, is_tomorrow) = date_flags(&due_datetime);
 
         let display_time = format_display_time(&due_datetime, is_overdue);
 
         Self {
             id: task.id,
             content: task.content,
+            source: "todoist".to_string(),
+            can_complete: true,
+            due_datetime: due_datetime.map(|dt| dt.to_rfc3339()),
+            is_overdue,
+            is_today,
+            is_tomorrow,
+            display_time,
+        }
+    }
+
+    pub fn from_linear(
+        id: String,
+        identifier: String,
+        title: String,
+        due_date: Option<String>,
+    ) -> Self {
+        let due_datetime = due_date.as_deref().and_then(parse_due_date);
+        let (is_overdue, is_today, is_tomorrow) = date_flags(&due_datetime);
+        let display_time = format_linear_display_time(&due_datetime);
+
+        Self {
+            id,
+            content: format!("[{}] {}", identifier, title),
+            source: "linear".to_string(),
+            can_complete: false,
             due_datetime: due_datetime.map(|dt| dt.to_rfc3339()),
             is_overdue,
             is_today,
@@ -101,6 +108,38 @@ fn format_display_time(due_datetime: &Option<DateTime<Utc>>, is_overdue: bool) -
     }
 }
 
+fn format_linear_display_time(due_datetime: &Option<DateTime<Utc>>) -> String {
+    due_datetime
+        .as_ref()
+        .map(|dt| dt.with_timezone(&Local).format("%b %-d").to_string())
+        .unwrap_or_else(|| "In progress".to_string())
+}
+
+fn date_flags(due_datetime: &Option<DateTime<Utc>>) -> (bool, bool, bool) {
+    let is_overdue = due_datetime
+        .as_ref()
+        .map(|dt| dt < &Utc::now())
+        .unwrap_or(false);
+
+    let is_today = due_datetime
+        .as_ref()
+        .map(|dt| {
+            let today = Local::now().date_naive();
+            dt.with_timezone(&Local).date_naive() == today
+        })
+        .unwrap_or(false);
+
+    let is_tomorrow = due_datetime
+        .as_ref()
+        .map(|dt| {
+            let tomorrow = Local::now().date_naive() + chrono::Duration::days(1);
+            dt.with_timezone(&Local).date_naive() == tomorrow
+        })
+        .unwrap_or(false);
+
+    (is_overdue, is_today, is_tomorrow)
+}
+
 /// Task from Todoist API
 #[derive(Debug, Deserialize)]
 pub struct TodoistTask {
@@ -121,6 +160,7 @@ pub struct TaskList {
     pub overdue: Vec<TodoTask>,
     pub today: Vec<TodoTask>,
     pub tomorrow: Vec<TodoTask>,
+    pub in_progress: Vec<TodoTask>,
 }
 
 /// Sort tasks: overdue first, then chronologically
@@ -147,17 +187,31 @@ pub fn sort_tasks(tasks: &mut [TodoTask]) {
 pub fn group_tasks(mut tasks: Vec<TodoTask>) -> TaskList {
     sort_tasks(&mut tasks);
 
-    let overdue: Vec<_> = tasks.iter().filter(|t| t.is_overdue).cloned().collect();
-    let today: Vec<_> = tasks
+    let overdue: Vec<_> = tasks
         .iter()
-        .filter(|t| t.is_today && !t.is_overdue)
+        .filter(|t| t.source == "todoist" && t.is_overdue)
         .cloned()
         .collect();
-    let tomorrow: Vec<_> = tasks.iter().filter(|t| t.is_tomorrow).cloned().collect();
+    let today: Vec<_> = tasks
+        .iter()
+        .filter(|t| t.source == "todoist" && t.is_today && !t.is_overdue)
+        .cloned()
+        .collect();
+    let tomorrow: Vec<_> = tasks
+        .iter()
+        .filter(|t| t.source == "todoist" && t.is_tomorrow)
+        .cloned()
+        .collect();
+    let in_progress: Vec<_> = tasks
+        .iter()
+        .filter(|t| t.source == "linear")
+        .cloned()
+        .collect();
 
     TaskList {
         overdue,
         today,
         tomorrow,
+        in_progress,
     }
 }

@@ -1,6 +1,6 @@
 # Todo Tray
 
-A macOS menubar application for Todoist, built in Rust.
+A macOS menubar application for Todoist with optional Linear in-progress issues, built in Rust.
 
 ## Features
 
@@ -8,6 +8,7 @@ A macOS menubar application for Todoist, built in Rust.
 - 📋 Click to see today's tasks sorted chronologically
 - ⚠️ Overdue tasks appear at the top
 - ✅ Click a task to mark it as complete
+- 🟦 Optional Linear integration for assigned in-progress issues
 - 🔔 Notifications for newly overdue tasks
 - 🔄 Auto-refreshes every 5 minutes
 
@@ -48,7 +49,9 @@ A macOS menubar application for Todoist, built in Rust.
     ```bash
     # macOS
     mkdir -p ~/Library/Application\ Support/todo-tray
-    echo 'api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
+    echo 'todoist_api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
+    # optional
+    echo 'linear_api_token = "YOUR_LINEAR_API_KEY"' >> ~/Library/Application\ Support/todo-tray/config.toml
     ```
 
 3. **Build and run**:
@@ -77,7 +80,9 @@ Config file location:
 - **macOS**: `~/Library/Application Support/todo-tray/config.toml`
 
 ```toml
-api_token = "your_todoist_api_token_here"
+todoist_api_token = "your_todoist_api_token_here"
+# Optional: include Linear issues assigned to you that are In Progress
+linear_api_token = "your_linear_api_key_here"
 ```
 
 ## Development
@@ -97,6 +102,7 @@ src/
 ├── main.rs         # Entry point
 ├── config.rs       # Config file handling
 ├── todoist.rs      # Todoist API client
+├── linear.rs       # Linear API client (assigned in-progress issues)
 ├── tray.rs         # Tray icon & menu management
 ├── notification.rs # macOS notifications
 └── icon.rs         # Tray icon generation

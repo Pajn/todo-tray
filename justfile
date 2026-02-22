@@ -68,7 +68,9 @@ ci: fmt-check lint test
 # Create config directory and template
 setup-config:
     mkdir -p ~/Library/Application\ Support/todo-tray
-    @echo 'api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
+    @echo 'todoist_api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# Optional: Linear API key for assigned in-progress issues' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# linear_api_token = "lin_api_..."' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo "Config created at ~/Library/Application Support/todo-tray/config.toml"
     @echo "Edit it with your Todoist API token from:"
     @echo "  https://app.todoist.com/prefs/integrations"

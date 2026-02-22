@@ -5,7 +5,8 @@ use std::path::PathBuf;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub api_token: String,
+    #[serde(alias = "api_token")]
+    pub todoist_api_token: String,
 
     #[serde(default)]
     pub autostart: bool,
@@ -17,7 +18,7 @@ impl Config {
 
         if !config_path.exists() {
             return Err(anyhow::anyhow!(
-                "Config file not found at {:?}\n\nPlease create it with your Todoist API token:\n\n  mkdir -p ~/.config/todo-tray\n  echo 'api_token = \"YOUR_TOKEN_HERE\"' > ~/.config/todo-tray/config.toml\n\nGet your API token from: https://app.todoist.com/prefs/integrations",
+                "Config file not found at {:?}\n\nPlease create it with your Todoist API token:\n\n  mkdir -p ~/.config/todo-tray\n  echo 'todoist_api_token = \"YOUR_TOKEN_HERE\"' > ~/.config/todo-tray/config.toml\n\nGet your API token from: https://app.todoist.com/prefs/integrations",
                 config_path
             ));
         }
@@ -25,10 +26,10 @@ impl Config {
         let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
 
         let config: Config = toml::from_str(&content).context(
-            "Failed to parse config file. Make sure it contains: api_token = \"your_token\"",
+            "Failed to parse config file. Make sure it contains: todoist_api_token = \"your_token\"",
         )?;
 
-        if config.api_token.is_empty() || config.api_token == "YOUR_TOKEN_HERE" {
+        if config.todoist_api_token.is_empty() || config.todoist_api_token == "YOUR_TOKEN_HERE" {
             return Err(anyhow::anyhow!(
                 "Please set your actual Todoist API token in {:?}",
                 config_path

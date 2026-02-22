@@ -47,7 +47,14 @@ class StatusBarController: NSObject {
     
     /// Update the state from Rust
     func updateState(_ state: AppState) {
-        os_log("updateState called with %d overdue, %d today", log: logger, type: .info, state.overdueCount, state.todayCount)
+        os_log(
+            "updateState called with %d overdue, %d today, %d linear in progress",
+            log: logger,
+            type: .info,
+            state.overdueCount,
+            state.todayCount,
+            state.inProgressCount
+        )
         currentState = state
         updateMenuBar()
         rebuildMenu()
@@ -79,11 +86,13 @@ class StatusBarController: NSObject {
             statusItem.button?.title = "! \(state.overdueCount)"
         } else if state.todayCount > 0 {
             statusItem.button?.title = "\(state.todayCount)"
+        } else if state.inProgressCount > 0 {
+            statusItem.button?.title = "L \(state.inProgressCount)"
         } else {
             statusItem.button?.title = "0"
         }
         
-        statusItem.button?.toolTip = "Todo Tray - \(state.overdueCount) overdue, \(state.todayCount) today"
+        statusItem.button?.toolTip = "Todo Tray - \(state.overdueCount) overdue, \(state.todayCount) today, \(state.inProgressCount) linear in progress"
         os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, statusItem.button?.title ?? "nil")
     }
     
@@ -129,9 +138,22 @@ class StatusBarController: NSObject {
             }
             menu.addItem(.separator())
         }
+
+        // Linear in-progress section
+        if !state.tasks.inProgress.isEmpty {
+            menu.addItem(createHeader("Linear · In Progress"))
+            for task in state.tasks.inProgress {
+                menu.addItem(createTaskItem(task))
+            }
+            menu.addItem(.separator())
+        }
         
         // No tasks message
-        if state.tasks.overdue.isEmpty && state.tasks.today.isEmpty && (!showTomorrow || state.tasks.tomorrow.isEmpty) {
+        if state.tasks.overdue.isEmpty
+            && state.tasks.today.isEmpty
+            && (!showTomorrow || state.tasks.tomorrow.isEmpty)
+            && state.tasks.inProgress.isEmpty
+        {
             let item = menu.addItem(withTitle: "No tasks for today", action: nil, keyEquivalent: "")
             item.isEnabled = false
             menu.addItem(.separator())
@@ -162,8 +184,10 @@ class StatusBarController: NSObject {
     
     /// Create a task menu item with custom view (task name + right-aligned greyed time)
     private func createTaskItem(_ task: TodoTask) -> NSMenuItem {
-        let item = NSMenuItem(title: task.content, action: #selector(completeTask(_:)), keyEquivalent: "")
-        item.target = self
+        let action = task.canComplete ? #selector(completeTask(_:)) : nil
+        let item = NSMenuItem(title: task.content, action: action, keyEquivalent: "")
+        item.target = task.canComplete ? self : nil
+        item.isEnabled = task.canComplete
         
         // Create custom view with right-aligned time
         let taskView = TaskMenuItemView(title: task.content, time: task.displayTime)
@@ -211,8 +235,10 @@ class StatusBarController: NSObject {
             state.tasks.overdue.removeAll { $0.id == taskId }
             state.tasks.today.removeAll { $0.id == taskId }
             state.tasks.tomorrow.removeAll { $0.id == taskId }
+            state.tasks.inProgress.removeAll { $0.id == taskId }
             state.overdueCount = UInt32(state.tasks.overdue.count)
             state.todayCount = UInt32(state.tasks.today.count)
+            state.inProgressCount = UInt32(state.tasks.inProgress.count)
             currentState = state
             updateMenuBar()
             rebuildMenu()

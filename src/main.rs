@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     }
     
     // Create Todoist client
-    let client = TodoistClient::new(config.api_token);
+    let client = TodoistClient::new(config.todoist_api_token);
     
     // Run the tray application
     tray::run_event_loop(client)?;

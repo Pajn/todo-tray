@@ -8,6 +8,7 @@ uniffi::setup_scaffolding!();
 mod autostart;
 mod config;
 mod core;
+mod linear;
 mod task;
 mod todoist;
 

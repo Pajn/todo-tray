@@ -179,7 +179,7 @@ fn build_menu(tasks: &[Task]) -> Menu {
 **Location (macOS):** `~/Library/Application Support/todo-tray/config.toml`
 
 ```toml
-api_token = "your_todoist_api_token"
+todoist_api_token = "your_todoist_api_token"
 ```
 
 **Loading:**
