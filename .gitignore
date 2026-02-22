@@ -1,0 +1,6 @@
+/target
+/SwiftApp/.build/index-build
+/SwiftApp/TodoTray/.build
+/SwiftApp/TodoTray/Generated
+/SwiftApp/TodoTray/todo_tray_core.xcframework
+/SwiftApp/build

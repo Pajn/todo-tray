@@ -1,0 +1,398 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		83696DC850C6E791C2037710 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBCB09E5FE4E3166CB2FD63C /* StatusBarController.swift */; };
+		8BF5AD93EAA62148A270B578 /* todo_tray_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFB6FFA339388B0CDB353E4 /* todo_tray_core.swift */; };
+		BD7AF21F3F9336A7D3C08B13 /* TodoTrayEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A1E8AFD8E8853C981794FE /* TodoTrayEventHandler.swift */; };
+		C13E75492F38ABB42301EAF0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89045819EF76CF506A1449A2 /* main.swift */; };
+		EC6A4A252B5A31BB2511E65D /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A42590E1D9AF69F5436B82 /* NotificationManager.swift */; };
+		ECBB60D756B72AAAB550F3F1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ACD6615FBD914444431F640 /* AppDelegate.swift */; };
+		F311B22DB4BE342C69D6DB82 /* TaskMenuItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6EDDDDD51F2AD98AD8C77A /* TaskMenuItemView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		47A1E8AFD8E8853C981794FE /* TodoTrayEventHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoTrayEventHandler.swift; sourceTree = "<group>"; };
+		5ACD6615FBD914444431F640 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		5B6EDDDDD51F2AD98AD8C77A /* TaskMenuItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskMenuItemView.swift; sourceTree = "<group>"; };
+		89045819EF76CF506A1449A2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		B1A42590E1D9AF69F5436B82 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		BCFB6FFA339388B0CDB353E4 /* todo_tray_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = todo_tray_core.swift; sourceTree = "<group>"; };
+		CBCB09E5FE4E3166CB2FD63C /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
+		DF7A811207DF7B1539A94398 /* TodoTray.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TodoTray.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		05B211A3EDBBE8484B97419C /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				DF7A811207DF7B1539A94398 /* TodoTray.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		825AB7BB8EEF1271B16E0B62 = {
+			isa = PBXGroup;
+			children = (
+				D6D51F39C9DABD6A46B94DC1 /* Generated */,
+				E7A2A6FA64D811894A3EE7C0 /* Sources */,
+				05B211A3EDBBE8484B97419C /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D6D51F39C9DABD6A46B94DC1 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				BCFB6FFA339388B0CDB353E4 /* todo_tray_core.swift */,
+			);
+			name = Generated;
+			path = TodoTray/Generated;
+			sourceTree = "<group>";
+		};
+		E7A2A6FA64D811894A3EE7C0 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				5ACD6615FBD914444431F640 /* AppDelegate.swift */,
+				89045819EF76CF506A1449A2 /* main.swift */,
+				B1A42590E1D9AF69F5436B82 /* NotificationManager.swift */,
+				CBCB09E5FE4E3166CB2FD63C /* StatusBarController.swift */,
+				5B6EDDDDD51F2AD98AD8C77A /* TaskMenuItemView.swift */,
+				47A1E8AFD8E8853C981794FE /* TodoTrayEventHandler.swift */,
+			);
+			name = Sources;
+			path = TodoTray/Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		39C20CA9FCDCB938DC383D84 /* TodoTray */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C87C3F11F12E3E41FBD3F993 /* Build configuration list for PBXNativeTarget "TodoTray" */;
+			buildPhases = (
+				C2DD48F2C870CC76217879CC /* Build Rust Core */,
+				32C85306A20B54470D8BDEAB /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TodoTray;
+			packageProductDependencies = (
+			);
+			productName = TodoTray;
+			productReference = DF7A811207DF7B1539A94398 /* TodoTray.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		4D5FB3AA2CADB87BE9EDF86E /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					39C20CA9FCDCB938DC383D84 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = DF78E0F6B980E87E97702210 /* Build configuration list for PBXProject "TodoTray" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 825AB7BB8EEF1271B16E0B62;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				39C20CA9FCDCB938DC383D84 /* TodoTray */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		C2DD48F2C870CC76217879CC /* Build Rust Core */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Core";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/TodoTray/Generated/todo_tray_core.swift",
+				"$(SRCROOT)/TodoTray/Generated/module.modulemap",
+				"$(SRCROOT)/TodoTray/todo_tray_core.xcframework",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\ncd \"$SRCROOT/..\"\n\n# Build Rust library\ncargo build -p todo-tray-core --release --target aarch64-apple-darwin\n\n# Generate Swift bindings\nmkdir -p \"$SRCROOT/TodoTray/Generated\"\ncargo run -p todo-tray-core --bin uniffi-bindgen generate \\\n  --library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n  --language swift \\\n  --out-dir \"$SRCROOT/TodoTray/Generated\"\n\n# Rename modulemap\nif [ -f \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" ]; then\n  mv \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" \\\n     \"$SRCROOT/TodoTray/Generated/module.modulemap\"\nfi\n\n# Create xcframework if needed\nif [ ! -d \"$SRCROOT/TodoTray/todo_tray_core.xcframework\" ]; then\n  xcodebuild -create-xcframework \\\n    -library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n    -headers \"$SRCROOT/TodoTray/Generated\" \\\n    -output \"$SRCROOT/TodoTray/todo_tray_core.xcframework\"\nfi\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		32C85306A20B54470D8BDEAB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ECBB60D756B72AAAB550F3F1 /* AppDelegate.swift in Sources */,
+				EC6A4A252B5A31BB2511E65D /* NotificationManager.swift in Sources */,
+				83696DC850C6E791C2037710 /* StatusBarController.swift in Sources */,
+				F311B22DB4BE342C69D6DB82 /* TaskMenuItemView.swift in Sources */,
+				BD7AF21F3F9336A7D3C08B13 /* TodoTrayEventHandler.swift in Sources */,
+				C13E75492F38ABB42301EAF0 /* main.swift in Sources */,
+				8BF5AD93EAA62148A270B578 /* todo_tray_core.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		25BDCD58FD48FA2D0CCE09BC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = TodoTray/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.todo-tray.app";
+				PRODUCT_NAME = TodoTray;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		922A8F557E830FD585F175B9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = TodoTray/TodoTray.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/TodoTray/Generated",
+				);
+				INFOPLIST_FILE = TodoTray/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/TodoTray/todo_tray_core.xcframework/macos-arm64",
+				);
+				OTHER_LDFLAGS = (
+					"-ltodo_tray_core",
+					"-framework",
+					Cocoa,
+					"-framework",
+					UserNotifications,
+					"-framework",
+					SystemConfiguration,
+					"-framework",
+					Security,
+					"-liconv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.todo-tray.app";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/TodoTray/Generated",
+				);
+			};
+			name = Debug;
+		};
+		B571DCB73B064166F553ECF0 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = TodoTray/TodoTray.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/TodoTray/Generated",
+				);
+				INFOPLIST_FILE = TodoTray/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/TodoTray/todo_tray_core.xcframework/macos-arm64",
+				);
+				OTHER_LDFLAGS = (
+					"-ltodo_tray_core",
+					"-framework",
+					Cocoa,
+					"-framework",
+					UserNotifications,
+					"-framework",
+					SystemConfiguration,
+					"-framework",
+					Security,
+					"-liconv",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.todo-tray.app";
+				SDKROOT = macosx;
+				SWIFT_INCLUDE_PATHS = (
+					"$(SRCROOT)/TodoTray/Generated",
+				);
+			};
+			name = Release;
+		};
+		EF12AAA1AEB843E20126740C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = TodoTray/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.todo-tray.app";
+				PRODUCT_NAME = TodoTray;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C87C3F11F12E3E41FBD3F993 /* Build configuration list for PBXNativeTarget "TodoTray" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				922A8F557E830FD585F175B9 /* Debug */,
+				B571DCB73B064166F553ECF0 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DF78E0F6B980E87E97702210 /* Build configuration list for PBXProject "TodoTray" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25BDCD58FD48FA2D0CCE09BC /* Debug */,
+				EF12AAA1AEB843E20126740C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 4D5FB3AA2CADB87BE9EDF86E /* Project object */;
+}
