@@ -14,26 +14,6 @@ A macOS menubar application for Todoist with optional Linear and GitHub integrat
 - 🔔 Notifications for newly overdue tasks
 - 🔄 Auto-refreshes every 5 minutes
 
-## Screenshot
-
-```
-┌─────────────────────────────────┐
-│ 🔴 3                            │  ← Menubar shows overdue count
-├─────────────────────────────────┤
-│ ⚠️ OVERDUE                      │
-│ ⚠️ Call dentist · yesterday     │  ← Click to complete
-│ ⚠️ Submit report · 2d ago       │
-├─────────────────────────────────┤
-│ 📋 TODAY                        │
-│ ☐ Team meeting · 9:00 AM        │
-│ ☐ Review PR · 2:00 PM           │
-│ ☐ Write docs · 4:30 PM          │
-├─────────────────────────────────┤
-│ 🔄 Refresh                      │
-│ ❌ Quit                         │
-└─────────────────────────────────┘
-```
-
 ## Installation
 
 ### Prerequisites
@@ -113,26 +93,6 @@ RUST_LOG=debug cargo run
 # Build release
 cargo build --release
 ```
-
-## Architecture
-
-```
-src/
-├── main.rs         # Entry point
-├── config.rs       # Config file handling
-├── todoist.rs      # Todoist API client
-├── linear.rs       # Linear API client (assigned in-progress issues)
-├── tray.rs         # Tray icon & menu management
-├── notification.rs # macOS notifications
-└── icon.rs         # Tray icon generation
-```
-
-## Tech Stack
-
-- **GUI**: [tray-icon](https://docs.rs/tray-icon) + [winit](https://docs.rs/winit)
-- **HTTP**: [reqwest](https://docs.rs/reqwest) (async)
-- **Runtime**: [tokio](https://docs.rs/tokio)
-- **Notifications**: [mac-notification-sys](https://docs.rs/mac-notification-sys)
 
 ## License
 
