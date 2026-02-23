@@ -105,20 +105,30 @@ class StatusBarController: NSObject {
             return
         }
         
-        if state.overdueCount > 0 {
-            statusItem.button?.title = "! \(state.overdueCount)"
-        } else if state.todayCount > 0 {
-            statusItem.button?.title = "\(state.todayCount)"
-        } else if state.inProgressCount > 0 {
-            statusItem.button?.title = "L \(state.inProgressCount)"
-        } else if state.githubNotificationCount > 0 {
-            statusItem.button?.title = "GH \(state.githubNotificationCount)"
+        let overdue = Int(state.overdueCount)
+        let github = Int(state.githubNotificationCount)
+        let today = Int(state.todayCount)
+        let linear = Int(state.inProgressCount)
+        
+        var title: String
+        
+        if overdue > 0 && github > 0 {
+            title = "!\(overdue) + \(github)"
+        } else if overdue > 0 {
+            title = "!\(overdue)"
+        } else if github > 0 {
+            title = "0 + \(github)"
+        } else if today > 0 {
+            title = "\(today)"
+        } else if linear > 0 {
+            title = "L\(linear)"
         } else {
-            statusItem.button?.title = "0"
+            title = "0"
         }
         
-        statusItem.button?.toolTip = "Todo Tray - \(state.overdueCount) overdue, \(state.todayCount) today, \(state.inProgressCount) linear in progress, \(state.githubNotificationCount) GitHub notifications"
-        os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, statusItem.button?.title ?? "nil")
+        statusItem.button?.title = title
+        statusItem.button?.toolTip = "Todo Tray - \(overdue) overdue, \(today) today, \(linear) linear in progress, \(github) GitHub notifications"
+        os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, title)
     }
     
     /// Rebuild the menu
