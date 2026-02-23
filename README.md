@@ -1,6 +1,8 @@
 # Todo Tray
 
-A macOS menubar application for Todoist with optional Linear and GitHub integrations, built in Rust.
+A macOS menubar application for Todoist with optional Linear and GitHub integrations.
+
+Built with Rust (core logic) + Swift (native UI) via UniFFI.
 
 ## Features
 
@@ -14,85 +16,96 @@ A macOS menubar application for Todoist with optional Linear and GitHub integrat
 - 🔔 Notifications for newly overdue tasks
 - 🔄 Auto-refreshes every 5 minutes
 
-## Installation
-
-### Prerequisites
+## Prerequisites
 
 - Rust 1.70+ (install via [rustup](https://rustup.rs/))
-- macOS 11+ (Big Sur or later for SF Symbols support)
+- Xcode 15+ with Xcode Command Line Tools
+- [xcodegen](https://github.com/yonaskolb/Xcodegen) (`brew install xcodegen`)
+- [just](https://github.com/casey/just) (`brew install just`)
 
-### Setup
+## Installation
 
-1. **Get your Todoist API token**:
-   - Go to [Todoist Integrations Settings](https://app.todoist.com/prefs/integrations)
-   - Copy your API token
+### 1. Get your Todoist API token
 
-2. **Create the config file**:
-    ```bash
-    # macOS
-    mkdir -p ~/Library/Application\ Support/todo-tray
-    echo 'todoist_api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
-    # optional
-    echo 'linear_api_token = "YOUR_LINEAR_API_KEY"' >> ~/Library/Application\ Support/todo-tray/config.toml
-    # optional (repeat for multiple accounts)
-    cat >> ~/Library/Application\ Support/todo-tray/config.toml <<'EOF'
-    [[github_accounts]]
-    name = "work"
-    token = "ghp_..."
-    EOF
-    # optional
-    echo 'snooze_durations = ["30m", "1d"]' >> ~/Library/Application\ Support/todo-tray/config.toml
-    ```
+Go to [Todoist Integrations Settings](https://app.todoist.com/prefs/integrations) and copy your API token.
 
-3. **Build and run**:
-   ```bash
-   cargo build --release
-   ./target/release/todo-tray
-   ```
-
-### Optional: Create a macOS App Bundle
-
-To make it a proper macOS app that can be added to login items:
+### 2. Create the config file
 
 ```bash
-cargo install cargo-bundle
-cargo bundle --release
+just setup-config
+# Then edit the config file with your token:
+open -e ~/Library/Application\ Support/todo-tray/config.toml
 ```
 
-Then run:
+Or manually:
+
 ```bash
-open target/release/bundle/macos/Todo\ Tray.app
+mkdir -p ~/Library/Application\ Support/todo-tray
+cat > ~/Library/Application\ Support/todo-tray/config.toml << 'EOF'
+todoist_api_token = "YOUR_API_TOKEN_HERE"
+
+# Optional: Linear in-progress issues
+# linear_api_token = "lin_api_..."
+
+# Optional: GitHub notifications (repeat block for multiple accounts)
+# [[github_accounts]]
+# name = "work"
+# token = "ghp_..."
+
+# Optional: Snooze durations (default: 30m, 1d)
+# snooze_durations = ["30m", "1d"]
+EOF
 ```
 
-## Configuration
+### 3. Build and run
 
-Config file location:
-- **macOS**: `~/Library/Application Support/todo-tray/config.toml`
-
-```toml
-todoist_api_token = "your_todoist_api_token_here"
-# Optional: include Linear issues assigned to you that are In Progress
-linear_api_token = "your_linear_api_key_here"
-# Optional: include GitHub notifications grouped by account
-[[github_accounts]]
-name = "work"
-token = "ghp_..."
-[[github_accounts]]
-name = "personal"
-token = "ghp_..."
-# Optional: todoist submenu snooze options
-snooze_durations = ["30m", "1d"]
+```bash
+just run
 ```
 
 ## Development
 
 ```bash
-# Run in development mode with logging
-RUST_LOG=debug cargo run
-
-# Build release
-cargo build --release
+just build-core     # Build Rust library only
+just build-app      # Build complete app
+just rebuild        # Clean + full rebuild (use when Rust code changed)
+just run            # Build and open app
+just fresh          # Rebuild and run
+just lint           # Run clippy
+just fmt            # Format code
 ```
+
+## Configuration
+
+Config file location: `~/Library/Application Support/todo-tray/config.toml`
+
+```toml
+todoist_api_token = "your_todoist_api_token"
+
+# Optional: include Linear issues assigned to you that are In Progress
+linear_api_token = "your_linear_api_key"
+
+# Optional: GitHub notifications grouped by account
+[[github_accounts]]
+name = "work"
+token = "ghp_..."
+
+[[github_accounts]]
+name = "personal"
+token = "ghp_..."
+
+# Optional: todoist snooze options
+snooze_durations = ["30m", "1d"]
+
+# Optional: auto-launch at login
+autostart = true
+```
+
+## Architecture
+
+- **Rust Core** (`src/`): Business logic, API clients, state management
+- **Swift UI** (`SwiftApp/TodoTray/Sources/`): Native AppKit menubar app
+- **UniFFI**: Generates Swift bindings from Rust types
 
 ## License
 

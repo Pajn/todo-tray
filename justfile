@@ -7,11 +7,11 @@ default:
 
 # Build the Rust core library
 build-core:
-    cd todo-tray-core && cargo build
+    cargo build
 
 # Build the Rust core library (release)
 build-core-release:
-    cd todo-tray-core && cargo build --release
+    cargo build --release
 
 # Generate Xcode project (requires xcodegen)
 gen-xcode:
