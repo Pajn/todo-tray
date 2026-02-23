@@ -71,6 +71,12 @@ setup-config:
     @echo 'todoist_api_token = "YOUR_API_TOKEN_HERE"' > ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# Optional: Linear API key for assigned in-progress issues' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# linear_api_token = "lin_api_..."' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# Optional: GitHub notifications (repeat block for multiple accounts)' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# [[github_accounts]]' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# name = "work"' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# token = "ghp_..."' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# Optional: todoist submenu snooze durations (default: ["30m", "1d"])' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# snooze_durations = ["30m", "1d"]' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo "Config created at ~/Library/Application Support/todo-tray/config.toml"
     @echo "Edit it with your Todoist API token from:"
     @echo "  https://app.todoist.com/prefs/integrations"

@@ -9,8 +9,8 @@ class TaskMenuItemView: NSView {
     /// Standard menu item height
     private static let menuItemHeight: CGFloat = 22
     
-    /// Standard menu width for status bar menus
-    private static let menuWidth: CGFloat = 280
+    /// Fallback width before the view is attached to its menu row container.
+    private static let minimumMenuWidth: CGFloat = 280
     
     /// Left margin for content
     private let leftMargin: CGFloat = 20
@@ -58,8 +58,8 @@ class TaskMenuItemView: NSView {
     // MARK: - Initialization
     
     init(title: String, time: String) {
-        // Set explicit frame size for menu items
-        let frame = NSRect(x: 0, y: 0, width: Self.menuWidth, height: Self.menuItemHeight)
+        // Start with a fallback width; we expand to the actual row width once mounted.
+        let frame = NSRect(x: 0, y: 0, width: Self.minimumMenuWidth, height: Self.menuItemHeight)
         super.init(frame: frame)
         
         setupView()
@@ -112,11 +112,12 @@ class TaskMenuItemView: NSView {
     // MARK: - Layout
     
     override var intrinsicContentSize: NSSize {
-        return NSSize(width: Self.menuWidth, height: Self.menuItemHeight)
+        return NSSize(width: max(frame.width, Self.minimumMenuWidth), height: Self.menuItemHeight)
     }
     
     override func layout() {
         super.layout()
+        syncToContainerWidth()
         needsDisplay = true
     }
     
@@ -146,9 +147,15 @@ class TaskMenuItemView: NSView {
     
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        syncToContainerWidth()
         
         // Set up tracking area for hover effects
         updateTrackingAreas()
+    }
+
+    override func viewDidMoveToSuperview() {
+        super.viewDidMoveToSuperview()
+        syncToContainerWidth()
     }
     
     override func updateTrackingAreas() {
@@ -175,6 +182,16 @@ class TaskMenuItemView: NSView {
         // Trigger the menu item's action
         if let menuItem = enclosingMenuItem {
             _ = menuItem.target?.perform(menuItem.action, with: menuItem)
+        }
+    }
+
+    private func syncToContainerWidth() {
+        guard let container = superview else { return }
+        let width = container.bounds.width
+        guard width > 0 else { return }
+        if abs(frame.width - width) > 0.5 {
+            frame = NSRect(x: 0, y: 0, width: width, height: Self.menuItemHeight)
+            invalidateIntrinsicContentSize()
         }
     }
     

@@ -3,7 +3,7 @@
 use crate::task::{TodoTask, TodoistTask};
 use anyhow::{Context, Result};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const TODOIST_API_URL: &str = "https://api.todoist.com/api/v1";
@@ -94,6 +94,37 @@ impl TodoistClient {
             let body = response.text().await.unwrap_or_default();
             return Err(anyhow::anyhow!(
                 "Failed to complete task ({}): {}",
+                status,
+                body
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Update a task due datetime.
+    pub async fn update_task_due_datetime(&self, task_id: &str, due_datetime: &str) -> Result<()> {
+        let url = format!("{}/tasks/{}", TODOIST_API_URL, task_id);
+
+        #[derive(Serialize)]
+        struct UpdateTaskRequest<'a> {
+            due_datetime: &'a str,
+        }
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_token))
+            .json(&UpdateTaskRequest { due_datetime })
+            .send()
+            .await
+            .context("Failed to connect to Todoist API")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Failed to update task due date ({}): {}",
                 status,
                 body
             ));

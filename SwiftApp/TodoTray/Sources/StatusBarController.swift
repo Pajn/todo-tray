@@ -1,6 +1,28 @@
 import Cocoa
 import os.log
 
+private final class GitHubNotificationMenuPayload: NSObject {
+    let accountName: String
+    let threadId: String
+    let webUrl: String
+    
+    init(accountName: String, threadId: String, webUrl: String) {
+        self.accountName = accountName
+        self.threadId = threadId
+        self.webUrl = webUrl
+    }
+}
+
+private final class TodoistSnoozeMenuPayload: NSObject {
+    let taskId: String
+    let durationLabel: String
+    
+    init(taskId: String, durationLabel: String) {
+        self.taskId = taskId
+        self.durationLabel = durationLabel
+    }
+}
+
 /// Manages the status bar item and menu
 /// This file is compiled together with the UniFFI-generated todo_tray_core.swift
 class StatusBarController: NSObject {
@@ -48,12 +70,13 @@ class StatusBarController: NSObject {
     /// Update the state from Rust
     func updateState(_ state: AppState) {
         os_log(
-            "updateState called with %d overdue, %d today, %d linear in progress",
+            "updateState called with %d overdue, %d today, %d linear in progress, %d github notifications",
             log: logger,
             type: .info,
             state.overdueCount,
             state.todayCount,
-            state.inProgressCount
+            state.inProgressCount,
+            state.githubNotificationCount
         )
         currentState = state
         updateMenuBar()
@@ -88,11 +111,13 @@ class StatusBarController: NSObject {
             statusItem.button?.title = "\(state.todayCount)"
         } else if state.inProgressCount > 0 {
             statusItem.button?.title = "L \(state.inProgressCount)"
+        } else if state.githubNotificationCount > 0 {
+            statusItem.button?.title = "GH \(state.githubNotificationCount)"
         } else {
             statusItem.button?.title = "0"
         }
         
-        statusItem.button?.toolTip = "Todo Tray - \(state.overdueCount) overdue, \(state.todayCount) today, \(state.inProgressCount) linear in progress"
+        statusItem.button?.toolTip = "Todo Tray - \(state.overdueCount) overdue, \(state.todayCount) today, \(state.inProgressCount) linear in progress, \(state.githubNotificationCount) GitHub notifications"
         os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, statusItem.button?.title ?? "nil")
     }
     
@@ -148,11 +173,21 @@ class StatusBarController: NSObject {
             menu.addItem(.separator())
         }
         
+        // GitHub notifications grouped by account
+        for section in state.githubNotifications where !section.notifications.isEmpty {
+            menu.addItem(createHeader("GitHub · \(section.accountName)"))
+            for notification in section.notifications {
+                menu.addItem(createGitHubNotificationItem(notification, accountName: section.accountName))
+            }
+            menu.addItem(.separator())
+        }
+        
         // No tasks message
         if state.tasks.overdue.isEmpty
             && state.tasks.today.isEmpty
             && (!showTomorrow || state.tasks.tomorrow.isEmpty)
             && state.tasks.inProgress.isEmpty
+            && state.githubNotifications.allSatisfy({ $0.notifications.isEmpty })
         {
             let item = menu.addItem(withTitle: "No tasks for today", action: nil, keyEquivalent: "")
             item.isEnabled = false
@@ -184,15 +219,76 @@ class StatusBarController: NSObject {
     
     /// Create a task menu item with custom view (task name + right-aligned greyed time)
     private func createTaskItem(_ task: TodoTask) -> NSMenuItem {
-        let action = task.canComplete ? #selector(completeTask(_:)) : nil
+        if task.source == "todoist" && task.canComplete {
+            return createTodoistTaskSubmenu(task)
+        }
+
+        let action: Selector? = if task.canComplete {
+            #selector(completeTask(_:))
+        } else if task.source == "linear", task.openUrl != nil {
+            #selector(openLinearTask(_:))
+        } else {
+            nil
+        }
+
         let item = NSMenuItem(title: task.content, action: action, keyEquivalent: "")
-        item.target = task.canComplete ? self : nil
-        item.isEnabled = task.canComplete
+        item.target = action != nil ? self : nil
+        item.isEnabled = action != nil
         
         // Create custom view with right-aligned time
         let taskView = TaskMenuItemView(title: task.content, time: task.displayTime)
         item.view = taskView
-        item.representedObject = task.id
+        if task.canComplete {
+            item.representedObject = task.id
+        } else if let openUrl = task.openUrl {
+            item.representedObject = openUrl
+        }
+        
+        return item
+    }
+
+    private func createTodoistTaskSubmenu(_ task: TodoTask) -> NSMenuItem {
+        let item = NSMenuItem(title: "\(task.content) · \(task.displayTime)", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: task.content)
+
+        let resolve = NSMenuItem(title: "Resolve", action: #selector(completeTask(_:)), keyEquivalent: "")
+        resolve.target = self
+        resolve.representedObject = task.id
+        submenu.addItem(resolve)
+
+        let durations = (currentState?.snoozeDurations.isEmpty == false)
+            ? (currentState?.snoozeDurations ?? [])
+            : ["30m", "1d"]
+        for duration in durations {
+            let snooze = NSMenuItem(
+                title: "Snooze \(duration)",
+                action: #selector(snoozeTodoistTask(_:)),
+                keyEquivalent: ""
+            )
+            snooze.target = self
+            snooze.representedObject = TodoistSnoozeMenuPayload(taskId: task.id, durationLabel: duration)
+            submenu.addItem(snooze)
+        }
+
+        item.submenu = submenu
+        return item
+    }
+    
+    /// Create a GitHub notification item that opens in browser and resolves it.
+    private func createGitHubNotificationItem(_ notification: GithubNotification, accountName: String) -> NSMenuItem {
+        let item = NSMenuItem(title: notification.title, action: #selector(openGitHubNotification(_:)), keyEquivalent: "")
+        item.target = self
+        
+        let view = TaskMenuItemView(
+            title: "\(notification.title) (\(notification.reason))",
+            time: notification.repository
+        )
+        item.view = view
+        item.representedObject = GitHubNotificationMenuPayload(
+            accountName: accountName,
+            threadId: notification.threadId,
+            webUrl: notification.webUrl
+        )
         
         return item
     }
@@ -250,6 +346,91 @@ class StatusBarController: NSObject {
                 // The complete method already calls refresh, which will update the state
             } catch {
                 showError("Failed to complete task: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    @objc func openLinearTask(_ sender: NSMenuItem) {
+        guard let openUrl = sender.representedObject as? String else { return }
+        os_log("Open Linear issue: %{public}@", log: logger, type: .info, openUrl)
+        
+        // Close the menu immediately for better UX
+        statusItem.menu?.cancelTracking()
+        
+        guard let url = URL(string: openUrl) else {
+            showError("Invalid Linear issue URL")
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc func snoozeTodoistTask(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? TodoistSnoozeMenuPayload else { return }
+        os_log(
+            "Snooze Todoist task %{public}@ by %{public}@",
+            log: logger,
+            type: .info,
+            payload.taskId,
+            payload.durationLabel
+        )
+
+        // Close the menu immediately for better UX
+        statusItem.menu?.cancelTracking()
+
+        Task { @MainActor in
+            do {
+                try core.snoozeTask(taskId: payload.taskId, durationLabel: payload.durationLabel)
+            } catch {
+                showError("Failed to snooze task: \(error.localizedDescription)")
+            }
+        }
+    }
+    
+    @objc func openGitHubNotification(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? GitHubNotificationMenuPayload else { return }
+        os_log(
+            "Open GitHub notification account=%{public}@ thread=%{public}@",
+            log: logger,
+            type: .info,
+            payload.accountName,
+            payload.threadId
+        )
+        
+        // Close the menu immediately for better UX
+        statusItem.menu?.cancelTracking()
+        
+        guard let url = URL(string: payload.webUrl) else {
+            showError("Invalid GitHub notification URL")
+            return
+        }
+        NSWorkspace.shared.open(url)
+        
+        // Optimistically remove the notification and update counts.
+        if var state = currentState {
+            for index in state.githubNotifications.indices {
+                if state.githubNotifications[index].accountName == payload.accountName {
+                    state.githubNotifications[index].notifications.removeAll { $0.threadId == payload.threadId }
+                }
+            }
+            state.githubNotifications.removeAll { $0.notifications.isEmpty }
+            state.githubNotificationCount = UInt32(
+                state.githubNotifications.reduce(0) { partial, section in
+                    partial + section.notifications.count
+                }
+            )
+            currentState = state
+            updateMenuBar()
+            rebuildMenu()
+        }
+        
+        Task { @MainActor in
+            do {
+                try core.resolveGithubNotification(
+                    accountName: payload.accountName,
+                    threadId: payload.threadId
+                )
+            } catch {
+                showError("Failed to resolve GitHub notification: \(error.localizedDescription)")
             }
         }
     }

@@ -10,6 +10,7 @@ pub struct TodoTask {
     pub content: String,
     pub source: String,
     pub can_complete: bool,
+    pub open_url: Option<String>,
     pub due_datetime: Option<String>, // ISO 8601 format
     pub is_overdue: bool,
     pub is_today: bool,
@@ -29,6 +30,7 @@ impl TodoTask {
             content: task.content,
             source: "todoist".to_string(),
             can_complete: true,
+            open_url: None,
             due_datetime: due_datetime.map(|dt| dt.to_rfc3339()),
             is_overdue,
             is_today,
@@ -52,6 +54,7 @@ impl TodoTask {
             content: format!("[{}] {}", identifier, title),
             source: "linear".to_string(),
             can_complete: false,
+            open_url: Some(format!("https://linear.app/issue/{}", identifier)),
             due_datetime: due_datetime.map(|dt| dt.to_rfc3339()),
             is_overdue,
             is_today,
