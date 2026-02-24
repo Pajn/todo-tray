@@ -13,6 +13,7 @@ Built with Rust (core logic) + Swift (native UI) via UniFFI.
 - ⏱️ Todoist submenu actions: Resolve + configurable Snooze durations
 - 🟦 Optional Linear integration for assigned in-progress issues
 - 🐙 Optional GitHub notifications with multiple accounts
+- 📅 Optional calendar events from iCal feeds (Google Calendar and others), with multiple feeds
 - 🔔 Notifications for newly overdue tasks
 - 🔄 Auto-refreshes every 5 minutes
 
@@ -51,6 +52,14 @@ todoist_api_token = "YOUR_API_TOKEN_HERE"
 # [[github_accounts]]
 # name = "work"
 # token = "ghp_..."
+
+# Optional: iCal feeds (repeat block for multiple calendars/providers)
+# [[calendar_feeds]]
+# name = "Work Calendar"
+# ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"
+#
+# Alias also supported:
+# url = "https://calendar.google.com/calendar/ical/.../basic.ics"
 
 # Optional: Snooze durations (default: 30m, 1d)
 # snooze_durations = ["30m", "1d"]
@@ -93,6 +102,15 @@ token = "ghp_..."
 [[github_accounts]]
 name = "personal"
 token = "ghp_..."
+
+# Optional: calendar events grouped by feed/account
+[[calendar_feeds]]
+name = "Work Calendar"
+ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"
+
+[[calendar_feeds]]
+name = "Personal Calendar"
+ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"
 
 # Optional: todoist snooze options
 snooze_durations = ["30m", "1d"]

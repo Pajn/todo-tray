@@ -6,6 +6,7 @@
 uniffi::setup_scaffolding!();
 
 mod autostart;
+mod calendar;
 mod config;
 mod core;
 mod github;
@@ -13,6 +14,7 @@ mod linear;
 mod task;
 mod todoist;
 
+pub use calendar::{CalendarEvent, CalendarEventSection};
 pub use core::{AppState, EventHandler, TodoTrayCore, TodoTrayError};
 pub use github::{GithubNotification, GithubNotificationSection};
 pub use task::{TaskList, TodoTask};

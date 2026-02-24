@@ -23,6 +23,14 @@ private final class TodoistSnoozeMenuPayload: NSObject {
     }
 }
 
+private final class CalendarEventMenuPayload: NSObject {
+    let webUrl: String
+
+    init(webUrl: String) {
+        self.webUrl = webUrl
+    }
+}
+
 /// Manages the status bar item and menu
 /// This file is compiled together with the UniFFI-generated todo_tray_core.swift
 class StatusBarController: NSObject {
@@ -70,13 +78,14 @@ class StatusBarController: NSObject {
     /// Update the state from Rust
     func updateState(_ state: AppState) {
         os_log(
-            "updateState called with %d overdue, %d today, %d linear in progress, %d github notifications",
+            "updateState called with %d overdue, %d today, %d linear in progress, %d github notifications, %d calendar events",
             log: logger,
             type: .info,
             state.overdueCount,
             state.todayCount,
             state.inProgressCount,
-            state.githubNotificationCount
+            state.githubNotificationCount,
+            state.calendarEventCount
         )
         currentState = state
         updateMenuBar()
@@ -109,6 +118,7 @@ class StatusBarController: NSObject {
         let github = Int(state.githubNotificationCount)
         let today = Int(state.todayCount)
         let linear = Int(state.inProgressCount)
+        let calendar = Int(state.calendarEventCount)
         
         var title: String
         
@@ -122,12 +132,14 @@ class StatusBarController: NSObject {
             title = "\(today)"
         } else if linear > 0 {
             title = "L\(linear)"
+        } else if calendar > 0 {
+            title = "C\(calendar)"
         } else {
             title = "0"
         }
         
         statusItem.button?.title = title
-        statusItem.button?.toolTip = "Todo Tray - \(overdue) overdue, \(today) today, \(linear) linear in progress, \(github) GitHub notifications"
+        statusItem.button?.toolTip = "Todo Tray - \(overdue) overdue, \(today) today, \(linear) linear in progress, \(github) GitHub notifications, \(calendar) calendar events"
         os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, title)
     }
     
@@ -191,6 +203,15 @@ class StatusBarController: NSObject {
             }
             menu.addItem(.separator())
         }
+
+        // Calendar events grouped by feed/account
+        for section in state.calendarEvents where !section.events.isEmpty {
+            menu.addItem(createHeader("Calendar · \(section.accountName)"))
+            for event in section.events {
+                menu.addItem(createCalendarEventItem(event))
+            }
+            menu.addItem(.separator())
+        }
         
         // No tasks message
         if state.tasks.overdue.isEmpty
@@ -198,6 +219,7 @@ class StatusBarController: NSObject {
             && (!showTomorrow || state.tasks.tomorrow.isEmpty)
             && state.tasks.inProgress.isEmpty
             && state.githubNotifications.allSatisfy({ $0.notifications.isEmpty })
+            && state.calendarEvents.allSatisfy({ $0.events.isEmpty })
         {
             let item = menu.addItem(withTitle: "No tasks for today", action: nil, keyEquivalent: "")
             item.isEnabled = false
@@ -308,6 +330,18 @@ class StatusBarController: NSObject {
         let title = enabled ? "✓ Autostart" : "Autostart"
         let item = NSMenuItem(title: title, action: #selector(toggleAutostart), keyEquivalent: "")
         item.target = self
+        return item
+    }
+
+    private func createCalendarEventItem(_ event: CalendarEvent) -> NSMenuItem {
+        let action: Selector? = event.openUrl != nil ? #selector(openCalendarEvent(_:)) : nil
+        let item = NSMenuItem(title: event.title, action: action, keyEquivalent: "")
+        item.target = action != nil ? self : nil
+        item.isEnabled = action != nil
+        item.view = TaskMenuItemView(title: event.title, time: event.displayTime)
+        if let url = event.openUrl {
+            item.representedObject = CalendarEventMenuPayload(webUrl: url)
+        }
         return item
     }
     
@@ -443,6 +477,20 @@ class StatusBarController: NSObject {
                 showError("Failed to resolve GitHub notification: \(error.localizedDescription)")
             }
         }
+    }
+
+    @objc func openCalendarEvent(_ sender: NSMenuItem) {
+        guard let payload = sender.representedObject as? CalendarEventMenuPayload else { return }
+        os_log("Open calendar event URL: %{public}@", log: logger, type: .info, payload.webUrl)
+
+        // Close the menu immediately for better UX
+        statusItem.menu?.cancelTracking()
+
+        guard let url = URL(string: payload.webUrl) else {
+            showError("Invalid calendar event URL")
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
     
     @objc func toggleAutostart() {

@@ -75,6 +75,10 @@ setup-config:
     @echo '# [[github_accounts]]' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# name = "work"' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# token = "ghp_..."' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# Optional: iCal feeds (repeat block for multiple calendars/providers)' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# [[calendar_feeds]]' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# name = "Work Calendar"' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# Optional: todoist submenu snooze durations (default: ["30m", "1d"])' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# snooze_durations = ["30m", "1d"]' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo "Config created at ~/Library/Application Support/todo-tray/config.toml"

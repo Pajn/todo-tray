@@ -3,6 +3,7 @@
 //! This module provides the main interface exposed to Swift via UniFFI.
 
 use crate::autostart;
+use crate::calendar::{CalendarClient, CalendarEventSection};
 use crate::config::{default_snooze_durations, Config};
 use crate::github::{GithubClient, GithubNotificationSection};
 use crate::linear::LinearClient;
@@ -58,8 +59,10 @@ pub struct AppState {
     pub tomorrow_count: u32,
     pub in_progress_count: u32,
     pub github_notification_count: u32,
+    pub calendar_event_count: u32,
     pub tasks: TaskList,
     pub github_notifications: Vec<GithubNotificationSection>,
+    pub calendar_events: Vec<CalendarEventSection>,
     pub snooze_durations: Vec<String>,
     pub is_loading: bool,
     pub error_message: Option<String>,
@@ -86,6 +89,7 @@ pub struct TodoTrayCore {
     todoist_client: Arc<TodoistClient>,
     linear_client: Option<Arc<LinearClient>>,
     github_clients: Vec<Arc<GithubClient>>,
+    calendar_clients: Vec<Arc<CalendarClient>>,
     snooze_durations: Vec<SnoozeDuration>,
     event_handler: Arc<dyn EventHandler>,
 }
@@ -133,6 +137,16 @@ impl TodoTrayCore {
                 ))
             })
             .collect::<Vec<_>>();
+        let calendar_clients = config
+            .calendar_feeds
+            .iter()
+            .map(|feed| {
+                Arc::new(CalendarClient::new(
+                    feed.name.trim().to_string(),
+                    feed.ical_url.trim().to_string(),
+                ))
+            })
+            .collect::<Vec<_>>();
         let raw_snooze = if config.snooze_durations.is_empty() {
             default_snooze_durations()
         } else {
@@ -169,6 +183,7 @@ impl TodoTrayCore {
             todoist_client,
             linear_client,
             github_clients,
+            calendar_clients,
             snooze_durations,
             event_handler,
         });
@@ -288,6 +303,7 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
             message: e.to_string(),
         })?;
     let github_sections = fetch_github_notifications(core).await?;
+    let calendar_sections = fetch_calendar_events(core).await?;
 
     if let Some(mut linear_tasks) = linear_tasks {
         tasks.append(&mut linear_tasks);
@@ -304,8 +320,13 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
         .iter()
         .map(|section| section.notifications.len() as u32)
         .sum();
+    state.calendar_event_count = calendar_sections
+        .iter()
+        .map(|section| section.events.len() as u32)
+        .sum();
     state.tasks = grouped;
     state.github_notifications = github_sections;
+    state.calendar_events = calendar_sections;
     state.is_loading = false;
     state.error_message = None;
 
@@ -441,6 +462,24 @@ async fn fetch_github_notifications(
                 message: e.to_string(),
             })?;
         if !section.notifications.is_empty() {
+            sections.push(section);
+        }
+    }
+    Ok(sections)
+}
+
+async fn fetch_calendar_events(
+    core: &TodoTrayCore,
+) -> Result<Vec<CalendarEventSection>, TodoTrayError> {
+    let mut sections = Vec::new();
+    for client in &core.calendar_clients {
+        let section = client
+            .get_today_events()
+            .await
+            .map_err(|e| TodoTrayError::Network {
+                message: e.to_string(),
+            })?;
+        if !section.events.is_empty() {
             sections.push(section);
         }
     }
