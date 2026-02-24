@@ -103,16 +103,13 @@ impl GithubClient {
             let item_count = page_items.len();
             notifications.extend(page_items.into_iter().filter(|n| n.unread).map(|thread| {
                 let updated = parse_updated_at(&thread.updated_at);
+                let web_url = build_web_url(&thread);
                 GithubNotification {
                     thread_id: thread.id.clone(),
                     title: thread.subject.title,
                     repository: thread.repository.full_name,
                     reason: humanize_reason(&thread.reason),
-                    // Use notifications query URL instead of direct thread path to avoid 404s.
-                    web_url: format!(
-                        "https://github.com/notifications?query=thread%3A{}",
-                        thread.id
-                    ),
+                    web_url,
                     updated_at: updated.map(|dt| dt.to_rfc3339()),
                     display_time: format_relative_time(updated),
                 }
@@ -176,11 +173,56 @@ struct GithubThread {
 #[derive(Debug, Deserialize)]
 struct GithubSubject {
     title: String,
+    url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 struct GithubRepository {
     full_name: String,
+}
+
+fn build_web_url(thread: &GithubThread) -> String {
+    // Prefer opening the underlying issue/PR when available.
+    if let Some(url) = thread
+        .subject
+        .url
+        .as_deref()
+        .and_then(api_subject_url_to_web_url)
+    {
+        return url;
+    }
+
+    // Fallback to inbox thread query for unsupported notification types.
+    format!(
+        "https://github.com/notifications?query=thread%3A{}",
+        thread.id
+    )
+}
+
+fn api_subject_url_to_web_url(url: &str) -> Option<String> {
+    let path = url.strip_prefix("https://api.github.com/")?;
+    let mut parts = path.split('/');
+
+    if parts.next()? != "repos" {
+        return None;
+    }
+
+    let owner = parts.next()?;
+    let repo = parts.next()?;
+    let kind = parts.next()?;
+    let number = parts.next()?;
+
+    match kind {
+        "issues" => Some(format!(
+            "https://github.com/{}/{}/issues/{}",
+            owner, repo, number
+        )),
+        "pulls" => Some(format!(
+            "https://github.com/{}/{}/pull/{}",
+            owner, repo, number
+        )),
+        _ => None,
+    }
 }
 
 fn parse_updated_at(value: &str) -> Option<DateTime<Utc>> {
@@ -216,4 +258,33 @@ fn humanize_reason(reason: &str) -> String {
     let mut value = first.to_uppercase().collect::<String>();
     value.push_str(chars.as_str());
     value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::api_subject_url_to_web_url;
+
+    #[test]
+    fn converts_issue_subject_url_to_web_url() {
+        let url = "https://api.github.com/repos/octo-org/octo-repo/issues/123";
+        assert_eq!(
+            api_subject_url_to_web_url(url).as_deref(),
+            Some("https://github.com/octo-org/octo-repo/issues/123")
+        );
+    }
+
+    #[test]
+    fn converts_pull_subject_url_to_web_url() {
+        let url = "https://api.github.com/repos/octo-org/octo-repo/pulls/456";
+        assert_eq!(
+            api_subject_url_to_web_url(url).as_deref(),
+            Some("https://github.com/octo-org/octo-repo/pull/456")
+        );
+    }
+
+    #[test]
+    fn returns_none_for_other_subject_url_types() {
+        let url = "https://api.github.com/repos/octo-org/octo-repo/commits/abcdef";
+        assert_eq!(api_subject_url_to_web_url(url), None);
+    }
 }
