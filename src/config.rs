@@ -76,7 +76,13 @@ impl Config {
 
         let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
 
-        let config: Config = toml::from_str(&content).context("Failed to parse config file")?;
+        let config: Config = toml::from_str(&content).map_err(|err| {
+            anyhow::anyhow!(
+                "Failed to parse config file at {:?}: {}",
+                config_path,
+                err
+            )
+        })?;
 
         if config.todoist_api_token.is_empty() || config.todoist_api_token == "YOUR_TOKEN_HERE" {
             return Err(anyhow::anyhow!(

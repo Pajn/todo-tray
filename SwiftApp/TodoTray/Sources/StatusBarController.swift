@@ -354,11 +354,14 @@ class StatusBarController: NSObject {
     }
     
     private func refreshAsync() {
-        Task { @MainActor in
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self else { return }
             do {
-                try core.refresh()
+                try self.core.refresh()
             } catch {
-                showError("Failed to refresh: \(error.localizedDescription)")
+                DispatchQueue.main.async { [weak self] in
+                    self?.showError("Failed to refresh: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -384,12 +387,14 @@ class StatusBarController: NSObject {
             rebuildMenu()
         }
         
-        Task { @MainActor in
+        guard let core else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             do {
                 try core.complete(taskId: taskId)
-                // The complete method already calls refresh, which will update the state
             } catch {
-                showError("Failed to complete task: \(error.localizedDescription)")
+                DispatchQueue.main.async { [weak self] in
+                    self?.showError("Failed to complete task: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -421,11 +426,14 @@ class StatusBarController: NSObject {
         // Close the menu immediately for better UX
         statusItem.menu?.cancelTracking()
 
-        Task { @MainActor in
+        guard let core else { return }
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             do {
                 try core.snoozeTask(taskId: payload.taskId, durationLabel: payload.durationLabel)
             } catch {
-                showError("Failed to snooze task: \(error.localizedDescription)")
+                DispatchQueue.main.async { [weak self] in
+                    self?.showError("Failed to snooze task: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -467,14 +475,19 @@ class StatusBarController: NSObject {
             rebuildMenu()
         }
         
-        Task { @MainActor in
+        guard let core else { return }
+        let accountName = payload.accountName
+        let threadId = payload.threadId
+        DispatchQueue.global(qos: .utility).async { [weak self] in
             do {
                 try core.resolveGithubNotification(
-                    accountName: payload.accountName,
-                    threadId: payload.threadId
+                    accountName: accountName,
+                    threadId: threadId
                 )
             } catch {
-                showError("Failed to resolve GitHub notification: \(error.localizedDescription)")
+                DispatchQueue.main.async { [weak self] in
+                    self?.showError("Failed to resolve GitHub notification: \(error.localizedDescription)")
+                }
             }
         }
     }

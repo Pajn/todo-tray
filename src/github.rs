@@ -221,6 +221,10 @@ fn api_subject_url_to_web_url(url: &str) -> Option<String> {
             "https://github.com/{}/{}/pull/{}",
             owner, repo, number
         )),
+        // GitHub notification subjects for releases use API paths like
+        // /repos/{owner}/{repo}/releases/{id}. Web URLs are tag-based, so
+        // map to the repo releases page when we only have an ID.
+        "releases" => Some(format!("https://github.com/{}/{}/releases", owner, repo)),
         _ => None,
     }
 }
@@ -286,5 +290,14 @@ mod tests {
     fn returns_none_for_other_subject_url_types() {
         let url = "https://api.github.com/repos/octo-org/octo-repo/commits/abcdef";
         assert_eq!(api_subject_url_to_web_url(url), None);
+    }
+
+    #[test]
+    fn converts_release_subject_url_to_releases_page() {
+        let url = "https://api.github.com/repos/octo-org/octo-repo/releases/123456";
+        assert_eq!(
+            api_subject_url_to_web_url(url).as_deref(),
+            Some("https://github.com/octo-org/octo-repo/releases")
+        );
     }
 }

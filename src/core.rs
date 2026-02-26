@@ -312,10 +312,7 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
     let grouped = group_tasks(tasks);
 
     let mut state = core.state.lock().await;
-    state.overdue_count = grouped.overdue.len() as u32;
-    state.today_count = grouped.today.len() as u32;
-    state.tomorrow_count = grouped.tomorrow.len() as u32;
-    state.in_progress_count = grouped.in_progress.len() as u32;
+    apply_grouped_tasks_to_state(&mut state, grouped);
     state.github_notification_count = github_sections
         .iter()
         .map(|section| section.notifications.len() as u32)
@@ -324,11 +321,8 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
         .iter()
         .map(|section| section.events.len() as u32)
         .sum();
-    state.tasks = grouped;
     state.github_notifications = github_sections;
     state.calendar_events = calendar_sections;
-    state.is_loading = false;
-    state.error_message = None;
 
     let state_copy = state.clone();
     drop(state);
@@ -373,8 +367,8 @@ async fn complete_task(core: &TodoTrayCore, task_id: String) -> Result<(), TodoT
     // Notify
     core.event_handler.on_task_completed(task_name);
 
-    // Refresh tasks
-    refresh_tasks(core).await?;
+    // Refresh only Todoist-backed task sections; other sources refresh on interval.
+    refresh_todoist_tasks(core).await?;
 
     Ok(())
 }
@@ -423,7 +417,8 @@ async fn snooze_task(
             message: e.to_string(),
         })?;
 
-    refresh_tasks(core).await
+    // Refresh only Todoist-backed task sections; other sources refresh on interval.
+    refresh_todoist_tasks(core).await
 }
 
 async fn resolve_github_notification_internal(
@@ -447,7 +442,95 @@ async fn resolve_github_notification_internal(
             message: e.to_string(),
         })?;
 
-    refresh_tasks(core).await
+    // Refresh only this account's GitHub notifications; other sources refresh on interval.
+    refresh_single_github_account(core, &account_name).await
+}
+
+async fn refresh_todoist_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
+    let mut todoist_tasks = core
+        .todoist_client
+        .get_tasks()
+        .await
+        .map_err(|e| TodoTrayError::Network {
+            message: e.to_string(),
+        })?;
+
+    // Keep currently-cached Linear tasks; they will be refreshed on the regular interval.
+    let cached_linear = {
+        let state = core.state.lock().await;
+        state.tasks.in_progress.clone()
+    };
+    todoist_tasks.extend(cached_linear);
+
+    let grouped = group_tasks(todoist_tasks);
+
+    let mut state = core.state.lock().await;
+    apply_grouped_tasks_to_state(&mut state, grouped);
+    let state_copy = state.clone();
+    drop(state);
+
+    core.event_handler.on_state_changed(state_copy);
+    Ok(())
+}
+
+async fn refresh_single_github_account(
+    core: &TodoTrayCore,
+    account_name: &str,
+) -> Result<(), TodoTrayError> {
+    let client = core
+        .github_clients
+        .iter()
+        .find(|client| client.account_name() == account_name)
+        .cloned()
+        .ok_or_else(|| TodoTrayError::NotFound {
+            message: format!("GitHub account not found: {}", account_name),
+        })?;
+
+    let section = client
+        .get_notifications()
+        .await
+        .map_err(|e| TodoTrayError::Network {
+            message: e.to_string(),
+        })?;
+
+    let mut state = core.state.lock().await;
+    let existing_index = state
+        .github_notifications
+        .iter()
+        .position(|s| s.account_name == account_name);
+    state
+        .github_notifications
+        .retain(|s| s.account_name != account_name);
+    if !section.notifications.is_empty() {
+        if let Some(index) = existing_index {
+            let index = index.min(state.github_notifications.len());
+            state.github_notifications.insert(index, section);
+        } else {
+            state.github_notifications.push(section);
+        }
+    }
+    state.github_notification_count = state
+        .github_notifications
+        .iter()
+        .map(|section| section.notifications.len() as u32)
+        .sum();
+    state.is_loading = false;
+    state.error_message = None;
+    let state_copy = state.clone();
+    drop(state);
+
+    core.event_handler.on_state_changed(state_copy);
+    Ok(())
+}
+
+fn apply_grouped_tasks_to_state(state: &mut AppState, grouped: TaskList) {
+    state.overdue_count = grouped.overdue.len() as u32;
+    state.today_count = grouped.today.len() as u32;
+    state.tomorrow_count = grouped.tomorrow.len() as u32;
+    state.in_progress_count = grouped.in_progress.len() as u32;
+    state.tasks = grouped;
+    state.is_loading = false;
+    state.error_message = None;
 }
 
 async fn fetch_github_notifications(
