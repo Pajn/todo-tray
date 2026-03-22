@@ -62,6 +62,36 @@ impl TodoTask {
             display_time,
         }
     }
+
+    pub fn from_linear_inbox(id: String, identifier: String, title: String) -> Self {
+        Self {
+            id,
+            content: format!("[{}] {}", identifier, title),
+            source: "linear_inbox".to_string(),
+            can_complete: false,
+            open_url: Some(format!("https://linear.app/issue/{}", identifier)),
+            due_datetime: None,
+            is_overdue: false,
+            is_today: false,
+            is_tomorrow: false,
+            display_time: "Inbox".to_string(),
+        }
+    }
+
+    pub fn from_linear_notification(id: String, title: String, open_url: Option<String>) -> Self {
+        Self {
+            id,
+            content: title,
+            source: "linear_inbox".to_string(),
+            can_complete: false,
+            open_url,
+            due_datetime: None,
+            is_overdue: false,
+            is_today: false,
+            is_tomorrow: false,
+            display_time: "Inbox".to_string(),
+        }
+    }
 }
 
 /// Parse a due date from Todoist API
@@ -163,6 +193,7 @@ pub struct TaskList {
     pub overdue: Vec<TodoTask>,
     pub today: Vec<TodoTask>,
     pub tomorrow: Vec<TodoTask>,
+    pub linear_inbox: Vec<TodoTask>,
     pub in_progress: Vec<TodoTask>,
 }
 
@@ -210,11 +241,17 @@ pub fn group_tasks(mut tasks: Vec<TodoTask>) -> TaskList {
         .filter(|t| t.source == "linear")
         .cloned()
         .collect();
+    let linear_inbox: Vec<_> = tasks
+        .iter()
+        .filter(|t| t.source == "linear_inbox")
+        .cloned()
+        .collect();
 
     TaskList {
         overdue,
         today,
         tomorrow,
+        linear_inbox,
         in_progress,
     }
 }

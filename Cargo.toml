@@ -31,6 +31,7 @@ toml = "0.8"
 
 # Date/time
 chrono = { version = "0.4", features = ["serde", "clock"] }
+rrule = "0.14"
 
 # Config directory paths
 dirs = "5"

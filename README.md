@@ -63,6 +63,9 @@ todoist_api_token = "YOUR_API_TOKEN_HERE"
 
 # Optional: Snooze durations (default: 30m, 1d)
 # snooze_durations = ["30m", "1d"]
+
+# Optional: show upcoming meetings in the tray before they start (default: 10)
+# meeting_focus_lead_time_minutes = 10
 EOF
 ```
 
@@ -114,6 +117,9 @@ ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"
 
 # Optional: todoist snooze options
 snooze_durations = ["30m", "1d"]
+
+# Optional: switch the tray title to the active/next meeting before start
+meeting_focus_lead_time_minutes = 10
 
 # Optional: auto-launch at login
 autostart = true

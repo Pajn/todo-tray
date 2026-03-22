@@ -3,7 +3,8 @@
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, Local, NaiveDate, NaiveDateTime, Utc};
 use reqwest::Client;
-use std::collections::HashMap;
+use rrule::RRuleSet;
+use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 #[derive(uniffi::Record, Clone, Debug)]
@@ -85,13 +86,12 @@ impl CalendarClient {
         let day_start_local = local_midnight(today)?;
         let day_end_local = day_start_local + ChronoDuration::days(1);
 
-        let mut events = parsed_feed
-            .events
-            .into_iter()
-            .filter_map(|event| {
-                raw_event_to_calendar_event(event, today, day_start_local, day_end_local)
-            })
-            .collect::<Vec<_>>();
+        let mut events = raw_events_to_calendar_events(
+            parsed_feed.events,
+            today,
+            day_start_local,
+            day_end_local,
+        );
 
         events.sort_by(|a, b| match (&a.start_at, &b.start_at) {
             (Some(left), Some(right)) => left.cmp(right),
@@ -113,7 +113,7 @@ struct ParsedFeed {
     events: Vec<RawEvent>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct RawEvent {
     uid: Option<String>,
     summary: Option<String>,
@@ -121,10 +121,20 @@ struct RawEvent {
     conference_url: Option<String>,
     starts_at: Option<EventTime>,
     ends_at: Option<EventTime>,
+    dtstart_line: Option<String>,
+    recurrence_lines: Vec<String>,
+    recurrence_id: Option<EventTime>,
+    status: Option<String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum EventTime {
+    Date(NaiveDate),
+    DateTime(DateTime<Utc>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+enum OccurrenceKey {
     Date(NaiveDate),
     DateTime(DateTime<Utc>),
 }
@@ -156,8 +166,14 @@ fn parse_ical_feed(content: &str) -> ParsedFeed {
                 "SUMMARY" => event.summary = Some(unescape_ical_text(&value)),
                 "URL" => event.url = Some(value),
                 "X-GOOGLE-CONFERENCE" => event.conference_url = Some(value),
-                "DTSTART" => event.starts_at = parse_event_time(&value, &params),
+                "STATUS" => event.status = Some(value.to_uppercase()),
+                "DTSTART" => {
+                    event.starts_at = parse_event_time(&value, &params);
+                    event.dtstart_line = Some(line.clone());
+                }
                 "DTEND" => event.ends_at = parse_event_time(&value, &params),
+                "RRULE" | "RDATE" | "EXDATE" | "EXRULE" => event.recurrence_lines.push(line.clone()),
+                "RECURRENCE-ID" => event.recurrence_id = parse_event_time(&value, &params),
                 _ => {}
             }
             continue;
@@ -249,6 +265,199 @@ fn raw_event_to_calendar_event(
                 display_time,
                 open_url,
             })
+        }
+    }
+}
+
+fn raw_events_to_calendar_events(
+    raw_events: Vec<RawEvent>,
+    today: NaiveDate,
+    day_start_local: DateTime<Local>,
+    day_end_local: DateTime<Local>,
+) -> Vec<CalendarEvent> {
+    let mut overrides: HashMap<String, HashMap<OccurrenceKey, RawEvent>> = HashMap::new();
+    let mut masters = Vec::new();
+
+    for event in raw_events {
+        if let (Some(uid), Some(recurrence_id)) = (event.uid.clone(), event.recurrence_id.clone()) {
+            overrides
+                .entry(uid)
+                .or_default()
+                .insert(OccurrenceKey::from_event_time(&recurrence_id), event);
+        } else {
+            masters.push(event);
+        }
+    }
+
+    let mut used_overrides: HashSet<(String, OccurrenceKey)> = HashSet::new();
+    let mut events = Vec::new();
+
+    for event in masters {
+        if event.status.as_deref() == Some("CANCELLED") {
+            continue;
+        }
+        let override_entries = event.uid.as_ref().and_then(|uid| overrides.get(uid));
+        let expanded = if event.recurrence_lines.is_empty() {
+            raw_event_to_calendar_event(event, today, day_start_local, day_end_local)
+                .into_iter()
+                .collect()
+        } else {
+            expand_recurring_event(
+                &event,
+                today,
+                day_start_local,
+                day_end_local,
+                override_entries,
+                &mut used_overrides,
+            )
+        };
+        events.extend(expanded);
+    }
+
+    for (uid, uid_overrides) in overrides {
+        for (key, event) in uid_overrides {
+            if used_overrides.contains(&(uid.clone(), key)) {
+                continue;
+            }
+            if event.status.as_deref() == Some("CANCELLED") {
+                continue;
+            }
+            if let Some(event) = raw_event_to_calendar_event(event, today, day_start_local, day_end_local) {
+                events.push(event);
+            }
+        }
+    }
+
+    events
+}
+
+fn expand_recurring_event(
+    raw: &RawEvent,
+    today: NaiveDate,
+    day_start_local: DateTime<Local>,
+    day_end_local: DateTime<Local>,
+    overrides: Option<&HashMap<OccurrenceKey, RawEvent>>,
+    used_overrides: &mut HashSet<(String, OccurrenceKey)>,
+) -> Vec<CalendarEvent> {
+    let Some(rrule_set) = build_rrule_set(raw, day_start_local, day_end_local) else {
+        return raw_event_to_calendar_event(raw.clone(), today, day_start_local, day_end_local)
+            .into_iter()
+            .collect();
+    };
+
+    let mut events = Vec::new();
+    let uid = raw.uid.clone().unwrap_or_default();
+    let Some(starts_at) = raw.starts_at.as_ref() else {
+        return events;
+    };
+    for occurrence in rrule_set.all(512).dates {
+        let key = OccurrenceKey::from_occurrence(starts_at, occurrence);
+        if let Some(override_event) = overrides.and_then(|items| items.get(&key)) {
+            used_overrides.insert((uid.clone(), key));
+            if override_event.status.as_deref() == Some("CANCELLED") {
+                continue;
+            }
+            if let Some(event) = raw_event_to_calendar_event(
+                override_event.clone(),
+                today,
+                day_start_local,
+                day_end_local,
+            ) {
+                events.push(event);
+            }
+            continue;
+        }
+
+        let Some(instance) = instantiate_occurrence(raw, occurrence) else {
+            continue;
+        };
+        if let Some(event) = raw_event_to_calendar_event(instance, today, day_start_local, day_end_local) {
+            events.push(event);
+        }
+    }
+
+    events
+}
+
+fn build_rrule_set(
+    raw: &RawEvent,
+    day_start_local: DateTime<Local>,
+    day_end_local: DateTime<Local>,
+) -> Option<RRuleSet> {
+    let dtstart_line = raw.dtstart_line.as_ref()?;
+    let mut rules = String::new();
+    rules.push_str(dtstart_line);
+    for line in &raw.recurrence_lines {
+        rules.push('\n');
+        rules.push_str(line);
+    }
+
+    let set: RRuleSet = rules.parse().ok()?;
+    let duration = occurrence_duration(raw);
+    let tz = set.get_dt_start().timezone();
+    let after = (day_start_local - duration).with_timezone(&tz);
+    let before = day_end_local.with_timezone(&tz);
+    Some(set.after(after).before(before))
+}
+
+fn occurrence_duration(raw: &RawEvent) -> ChronoDuration {
+    match (&raw.starts_at, &raw.ends_at) {
+        (Some(EventTime::Date(start)), Some(EventTime::Date(end))) => *end - *start,
+        (Some(EventTime::Date(_)), _) => ChronoDuration::days(1),
+        (Some(EventTime::DateTime(start)), Some(EventTime::DateTime(end))) => *end - *start,
+        (Some(EventTime::DateTime(start)), Some(EventTime::Date(end))) => {
+            local_midnight(*end)
+                .ok()
+                .map(|end_local| end_local.with_timezone(&Utc) - *start)
+                .unwrap_or_else(|| ChronoDuration::hours(1))
+        }
+        _ => ChronoDuration::hours(1),
+    }
+}
+
+fn instantiate_occurrence(raw: &RawEvent, occurrence: DateTime<rrule::Tz>) -> Option<RawEvent> {
+    let mut instance = raw.clone();
+    instance.recurrence_lines.clear();
+    instance.recurrence_id = None;
+    instance.dtstart_line = None;
+
+    match raw.starts_at.as_ref()? {
+        EventTime::Date(_) => {
+            let start_date = occurrence.date_naive();
+            let duration = occurrence_duration(raw).num_days().max(1);
+            instance.starts_at = Some(EventTime::Date(start_date));
+            instance.ends_at = Some(EventTime::Date(start_date + ChronoDuration::days(duration)));
+        }
+        EventTime::DateTime(_) => {
+            let start_utc = occurrence.with_timezone(&Utc);
+            instance.starts_at = Some(EventTime::DateTime(start_utc));
+            instance.ends_at = Some(EventTime::DateTime(start_utc + occurrence_duration(raw)));
+        }
+    }
+
+    if let Some(uid) = &raw.uid {
+        instance.uid = Some(format!(
+            "{}:{}",
+            uid,
+            occurrence.with_timezone(&Utc).to_rfc3339()
+        ));
+    }
+
+    Some(instance)
+}
+
+impl OccurrenceKey {
+    fn from_event_time(event_time: &EventTime) -> Self {
+        match event_time {
+            EventTime::Date(date) => Self::Date(*date),
+            EventTime::DateTime(dt) => Self::DateTime(*dt),
+        }
+    }
+
+    fn from_occurrence(starts_at: &EventTime, occurrence: DateTime<rrule::Tz>) -> Self {
+        match starts_at {
+            EventTime::Date(_) => Self::Date(occurrence.date_naive()),
+            EventTime::DateTime(_) => Self::DateTime(occurrence.with_timezone(&Utc)),
         }
     }
 }
@@ -347,7 +556,8 @@ fn local_midnight(date: NaiveDate) -> Result<DateTime<Local>> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_ical_feed;
+    use super::{local_midnight, parse_ical_feed, raw_events_to_calendar_events};
+    use chrono::{Duration as ChronoDuration, Local};
 
     #[test]
     fn parses_calendar_name_and_event_fields() {
@@ -365,5 +575,62 @@ mod tests {
             parsed.events[0].conference_url.as_deref(),
             Some("https://meet.google.com/nsn-dwjm-vrk")
         );
+    }
+
+    #[test]
+    fn expands_recurring_events_for_today() {
+        let today = Local::now().date_naive();
+        let start = today.format("%Y%m%d").to_string();
+        let ics = format!(
+            "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:daily-1\r\nSUMMARY:Standup\r\nDTSTART;VALUE=DATE:{start}\r\nDTEND;VALUE=DATE:{}\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+            (today + ChronoDuration::days(1)).format("%Y%m%d")
+        );
+
+        let parsed = parse_ical_feed(&ics);
+        let day_start = local_midnight(today).unwrap();
+        let day_end = day_start + ChronoDuration::days(1);
+        let events = raw_events_to_calendar_events(parsed.events, today, day_start, day_end);
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].title, "Standup");
+        assert_eq!(events[0].display_time, "All day");
+    }
+
+    #[test]
+    fn applies_exdate_to_recurring_events() {
+        let today = Local::now().date_naive();
+        let ics = format!(
+            "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:daily-2\r\nSUMMARY:Focus Time\r\nDTSTART;VALUE=DATE:{start}\r\nDTEND;VALUE=DATE:{end}\r\nRRULE:FREQ=DAILY;COUNT=3\r\nEXDATE;VALUE=DATE:{start}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+            start = today.format("%Y%m%d"),
+            end = (today + ChronoDuration::days(1)).format("%Y%m%d")
+        );
+
+        let parsed = parse_ical_feed(&ics);
+        let day_start = local_midnight(today).unwrap();
+        let day_end = day_start + ChronoDuration::days(1);
+        let events = raw_events_to_calendar_events(parsed.events, today, day_start, day_end);
+
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn prefers_recurrence_override_instance() {
+        let today = Local::now().date_naive();
+        let start = format!("{}T090000", today.format("%Y%m%d"));
+        let moved = format!("{}T110000", today.format("%Y%m%d"));
+        let ics = format!(
+            "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:series-1\r\nSUMMARY:1:1\r\nDTSTART:{start}\r\nDTEND:{}T093000\r\nRRULE:FREQ=DAILY;COUNT=2\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:series-1\r\nRECURRENCE-ID:{start}\r\nSUMMARY:1:1 moved\r\nDTSTART:{moved}\r\nDTEND:{}T113000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+            today.format("%Y%m%d"),
+            today.format("%Y%m%d"),
+        );
+
+        let parsed = parse_ical_feed(&ics);
+        let day_start = local_midnight(today).unwrap();
+        let day_end = day_start + ChronoDuration::days(1);
+        let events = raw_events_to_calendar_events(parsed.events, today, day_start, day_end);
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].title, "1:1 moved");
+        assert_eq!(events[0].display_time, "11:00-11:30");
     }
 }

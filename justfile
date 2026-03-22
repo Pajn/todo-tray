@@ -81,6 +81,8 @@ setup-config:
     @echo '# ical_url = "https://calendar.google.com/calendar/ical/.../basic.ics"' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# Optional: todoist submenu snooze durations (default: ["30m", "1d"])' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo '# snooze_durations = ["30m", "1d"]' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# Optional: switch the tray title to a meeting countdown before start (default: 10)' >> ~/Library/Application\ Support/todo-tray/config.toml
+    @echo '# meeting_focus_lead_time_minutes = 10' >> ~/Library/Application\ Support/todo-tray/config.toml
     @echo "Config created at ~/Library/Application Support/todo-tray/config.toml"
     @echo "Edit it with your Todoist API token from:"
     @echo "  https://app.todoist.com/prefs/integrations"
@@ -95,7 +97,6 @@ install-xcodegen:
 
 # Clean all build artifacts
 clean:
-    cargo clean
     rm -rf SwiftApp/build SwiftApp/TodoTray/todo_tray_core.xcframework SwiftApp/TodoTray/Generated
 
 # Update dependencies

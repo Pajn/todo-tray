@@ -24,6 +24,9 @@ pub struct Config {
     #[serde(default = "default_snooze_durations")]
     pub snooze_durations: Vec<String>,
 
+    #[serde(default = "default_meeting_focus_lead_time_minutes")]
+    pub meeting_focus_lead_time_minutes: u32,
+
     #[serde(default)]
     pub autostart: bool,
 }
@@ -45,6 +48,10 @@ pub struct CalendarFeedConfig {
 
 pub fn default_snooze_durations() -> Vec<String> {
     vec!["30m".to_string(), "1d".to_string()]
+}
+
+pub fn default_meeting_focus_lead_time_minutes() -> u32 {
+    10
 }
 
 impl Config {
@@ -69,6 +76,8 @@ impl Config {
                 ical_url = \"https://calendar.google.com/calendar/ical/.../basic.ics\"\n\n\
                 # Optional: todoist snooze durations (default: 30m, 1d)\n\
                 snooze_durations = [\"30m\", \"1d\"]\n\n\
+                # Optional: show meeting countdown before start (default: 10 minutes)\n\
+                meeting_focus_lead_time_minutes = 10\n\n\
                 Get your API token from: https://app.todoist.com/prefs/integrations",
                 config_path
             ));
@@ -77,11 +86,7 @@ impl Config {
         let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
 
         let config: Config = toml::from_str(&content).map_err(|err| {
-            anyhow::anyhow!(
-                "Failed to parse config file at {:?}: {}",
-                config_path,
-                err
-            )
+            anyhow::anyhow!("Failed to parse config file at {:?}: {}", config_path, err)
         })?;
 
         if config.todoist_api_token.is_empty() || config.todoist_api_token == "YOUR_TOKEN_HERE" {
@@ -149,6 +154,13 @@ impl Config {
                     config_path
                 ));
             }
+        }
+
+        if config.meeting_focus_lead_time_minutes > 1_440 {
+            return Err(anyhow::anyhow!(
+                "meeting_focus_lead_time_minutes must be 1440 or less in {:?}",
+                config_path
+            ));
         }
 
         Ok(config)

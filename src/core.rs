@@ -4,7 +4,9 @@
 
 use crate::autostart;
 use crate::calendar::{CalendarClient, CalendarEventSection};
-use crate::config::{default_snooze_durations, Config};
+use crate::config::{
+    default_meeting_focus_lead_time_minutes, default_snooze_durations, Config,
+};
 use crate::github::{GithubClient, GithubNotificationSection};
 use crate::linear::LinearClient;
 use crate::task::{group_tasks, TaskList};
@@ -52,21 +54,45 @@ impl From<anyhow::Error> for TodoTrayError {
 }
 
 /// Application state exposed to Swift
-#[derive(uniffi::Record, Clone, Debug, Default)]
+#[derive(uniffi::Record, Clone, Debug)]
 pub struct AppState {
     pub overdue_count: u32,
     pub today_count: u32,
     pub tomorrow_count: u32,
     pub in_progress_count: u32,
+    pub linear_notification_count: u32,
     pub github_notification_count: u32,
     pub calendar_event_count: u32,
     pub tasks: TaskList,
     pub github_notifications: Vec<GithubNotificationSection>,
     pub calendar_events: Vec<CalendarEventSection>,
     pub snooze_durations: Vec<String>,
+    pub meeting_focus_lead_time_minutes: u32,
     pub is_loading: bool,
     pub error_message: Option<String>,
     pub autostart_enabled: bool,
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self {
+            overdue_count: 0,
+            today_count: 0,
+            tomorrow_count: 0,
+            in_progress_count: 0,
+            linear_notification_count: 0,
+            github_notification_count: 0,
+            calendar_event_count: 0,
+            tasks: TaskList::default(),
+            github_notifications: Vec::new(),
+            calendar_events: Vec::new(),
+            snooze_durations: Vec::new(),
+            meeting_focus_lead_time_minutes: default_meeting_focus_lead_time_minutes(),
+            is_loading: false,
+            error_message: None,
+            autostart_enabled: false,
+        }
+    }
 }
 
 /// Trait implemented by Swift to receive state updates
@@ -178,6 +204,7 @@ impl TodoTrayCore {
                     .iter()
                     .map(|entry| entry.label.clone())
                     .collect(),
+                meeting_focus_lead_time_minutes: config.meeting_focus_lead_time_minutes,
                 ..Default::default()
             })),
             todoist_client,
@@ -200,6 +227,7 @@ impl TodoTrayCore {
                 eprintln!("[Rust] About to call refresh_tasks()...");
                 if let Err(e) = refresh_tasks(&core_clone).await {
                     eprintln!("[Rust] Initial refresh failed: {}", e);
+                    publish_refresh_error_state(&core_clone, &e).await;
                 }
                 eprintln!("[Rust] Initial refresh complete");
 
@@ -209,6 +237,7 @@ impl TodoTrayCore {
                     interval.tick().await;
                     if let Err(e) = refresh_tasks(&core_clone).await {
                         eprintln!("[Rust] Refresh failed: {}", e);
+                        publish_refresh_error_state(&core_clone, &e).await;
                     }
                 }
             });
@@ -294,18 +323,23 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
     let todoist = core.todoist_client.get_tasks();
     let linear = async {
         match &core.linear_client {
-            Some(client) => client.get_in_progress_issues().await.map(Some),
+            Some(client) => {
+                let in_progress = client.get_in_progress_issues().await?;
+                let inbox = client.get_inbox_notifications().await?;
+                Ok::<Option<(Vec<_>, Vec<_>)>, anyhow::Error>(Some((in_progress, inbox)))
+            }
             None => Ok(None),
         }
     };
-    let (mut tasks, linear_tasks) =
+    let (mut tasks, linear_data) =
         tokio::try_join!(todoist, linear).map_err(|e| TodoTrayError::Network {
             message: e.to_string(),
         })?;
     let github_sections = fetch_github_notifications(core).await?;
     let calendar_sections = fetch_calendar_events(core).await?;
 
-    if let Some(mut linear_tasks) = linear_tasks {
+    if let Some((mut linear_tasks, mut linear_inbox_tasks)) = linear_data {
+        tasks.append(&mut linear_inbox_tasks);
         tasks.append(&mut linear_tasks);
     }
 
@@ -332,6 +366,15 @@ async fn refresh_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
     Ok(())
 }
 
+async fn publish_refresh_error_state(core: &TodoTrayCore, error: &TodoTrayError) {
+    let mut state = core.state.lock().await;
+    state.is_loading = false;
+    state.error_message = Some(error.to_string());
+    let state_copy = state.clone();
+    drop(state);
+    core.event_handler.on_state_changed(state_copy);
+}
+
 async fn complete_task(core: &TodoTrayCore, task_id: String) -> Result<(), TodoTrayError> {
     // Lookup the task first so we can block completion for non-Todoist sources.
     let selected_task = {
@@ -342,6 +385,7 @@ async fn complete_task(core: &TodoTrayCore, task_id: String) -> Result<(), TodoT
             .iter()
             .chain(state.tasks.today.iter())
             .chain(state.tasks.tomorrow.iter())
+            .chain(state.tasks.linear_inbox.iter())
             .chain(state.tasks.in_progress.iter())
             .find(|t| t.id == task_id)
             .map(|t| (t.content.clone(), t.can_complete))
@@ -447,18 +491,20 @@ async fn resolve_github_notification_internal(
 }
 
 async fn refresh_todoist_tasks(core: &TodoTrayCore) -> Result<(), TodoTrayError> {
-    let mut todoist_tasks = core
-        .todoist_client
-        .get_tasks()
-        .await
-        .map_err(|e| TodoTrayError::Network {
-            message: e.to_string(),
-        })?;
+    let mut todoist_tasks =
+        core.todoist_client
+            .get_tasks()
+            .await
+            .map_err(|e| TodoTrayError::Network {
+                message: e.to_string(),
+            })?;
 
     // Keep currently-cached Linear tasks; they will be refreshed on the regular interval.
     let cached_linear = {
         let state = core.state.lock().await;
-        state.tasks.in_progress.clone()
+        let mut tasks = state.tasks.linear_inbox.clone();
+        tasks.extend(state.tasks.in_progress.clone());
+        tasks
     };
     todoist_tasks.extend(cached_linear);
 
@@ -527,6 +573,7 @@ fn apply_grouped_tasks_to_state(state: &mut AppState, grouped: TaskList) {
     state.overdue_count = grouped.overdue.len() as u32;
     state.today_count = grouped.today.len() as u32;
     state.tomorrow_count = grouped.tomorrow.len() as u32;
+    state.linear_notification_count = grouped.linear_inbox.len() as u32;
     state.in_progress_count = grouped.in_progress.len() as u32;
     state.tasks = grouped;
     state.is_loading = false;
