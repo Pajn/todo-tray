@@ -11,6 +11,7 @@
 		8BF5AD93EAA62148A270B578 /* todo_tray_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCFB6FFA339388B0CDB353E4 /* todo_tray_core.swift */; };
 		BD7AF21F3F9336A7D3C08B13 /* TodoTrayEventHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47A1E8AFD8E8853C981794FE /* TodoTrayEventHandler.swift */; };
 		C13E75492F38ABB42301EAF0 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89045819EF76CF506A1449A2 /* main.swift */; };
+		DA8FFF933781DE85CCE36A75 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AFD384390CB775345AA8287D /* Assets.xcassets */; };
 		EC6A4A252B5A31BB2511E65D /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A42590E1D9AF69F5436B82 /* NotificationManager.swift */; };
 		ECBB60D756B72AAAB550F3F1 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ACD6615FBD914444431F640 /* AppDelegate.swift */; };
 		F311B22DB4BE342C69D6DB82 /* TaskMenuItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B6EDDDDD51F2AD98AD8C77A /* TaskMenuItemView.swift */; };
@@ -21,6 +22,7 @@
 		5ACD6615FBD914444431F640 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		5B6EDDDDD51F2AD98AD8C77A /* TaskMenuItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskMenuItemView.swift; sourceTree = "<group>"; };
 		89045819EF76CF506A1449A2 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		AFD384390CB775345AA8287D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B1A42590E1D9AF69F5436B82 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		BCFB6FFA339388B0CDB353E4 /* todo_tray_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = todo_tray_core.swift; sourceTree = "<group>"; };
 		CBCB09E5FE4E3166CB2FD63C /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
@@ -36,10 +38,20 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		7F60AE6368B09140046A9F2F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AFD384390CB775345AA8287D /* Assets.xcassets */,
+			);
+			name = Resources;
+			path = TodoTray/Resources;
+			sourceTree = "<group>";
+		};
 		825AB7BB8EEF1271B16E0B62 = {
 			isa = PBXGroup;
 			children = (
 				D6D51F39C9DABD6A46B94DC1 /* Generated */,
+				7F60AE6368B09140046A9F2F /* Resources */,
 				E7A2A6FA64D811894A3EE7C0 /* Sources */,
 				05B211A3EDBBE8484B97419C /* Products */,
 			);
@@ -77,6 +89,7 @@
 			buildPhases = (
 				C2DD48F2C870CC76217879CC /* Build Rust Core */,
 				32C85306A20B54470D8BDEAB /* Sources */,
+				C458BB662C5C94F0136F1A92 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -122,6 +135,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		C458BB662C5C94F0136F1A92 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA8FFF933781DE85CCE36A75 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXShellScriptBuildPhase section */
 		C2DD48F2C870CC76217879CC /* Build Rust Core */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -143,7 +167,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\ncd \"$SRCROOT/..\"\n\n# Build Rust library\ncargo build -p todo-tray-core --release --target aarch64-apple-darwin\n\n# Generate Swift bindings\nmkdir -p \"$SRCROOT/TodoTray/Generated\"\ncargo run -p todo-tray-core --bin uniffi-bindgen generate \\\n  --library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n  --language swift \\\n  --out-dir \"$SRCROOT/TodoTray/Generated\"\n\n# Rename modulemap\nif [ -f \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" ]; then\n  mv \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" \\\n     \"$SRCROOT/TodoTray/Generated/module.modulemap\"\nfi\n\n# Create xcframework if needed\nif [ ! -d \"$SRCROOT/TodoTray/todo_tray_core.xcframework\" ]; then\n  xcodebuild -create-xcframework \\\n    -library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n    -headers \"$SRCROOT/TodoTray/Generated\" \\\n    -output \"$SRCROOT/TodoTray/todo_tray_core.xcframework\"\nfi\n";
+			shellScript = "set -e\ncd \"$SRCROOT/..\"\n\n# Remove old xcframework to ensure fresh build\nrm -rf \"$SRCROOT/TodoTray/todo_tray_core.xcframework\"\n\n# Build Rust library\ncargo build --release --target aarch64-apple-darwin\n\n# Generate Swift bindings\nmkdir -p \"$SRCROOT/TodoTray/Generated\"\ncargo run --bin uniffi-bindgen generate \\\n  --library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n  --language swift \\\n  --out-dir \"$SRCROOT/TodoTray/Generated\"\n\n# Rename modulemap\nif [ -f \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" ]; then\n  mv \"$SRCROOT/TodoTray/Generated/todo_tray_coreFFI.modulemap\" \\\n     \"$SRCROOT/TodoTray/Generated/module.modulemap\"\nfi\n\n# Create xcframework\nxcodebuild -create-xcframework \\\n  -library target/aarch64-apple-darwin/release/libtodo_tray_core.a \\\n  -headers \"$SRCROOT/TodoTray/Generated\" \\\n  -output \"$SRCROOT/TodoTray/todo_tray_core.xcframework\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

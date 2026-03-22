@@ -26,6 +26,7 @@ targets:
         excludes:
           - "**/.DS_Store"
           - "todo_tray_core.swift"
+      - path: TodoTray/Resources
       - path: TodoTray/Generated/todo_tray_core.swift
         optional: true
         type: file

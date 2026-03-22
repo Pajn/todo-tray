@@ -31,6 +31,12 @@ private final class CalendarEventMenuPayload: NSObject {
     }
 }
 
+private struct MeetingFocusContext {
+    let event: CalendarEvent
+    let titleSuffix: String
+    let googleMeetUrl: String?
+}
+
 /// Manages the status bar item and menu
 /// This file is compiled together with the UniFFI-generated todo_tray_core.swift
 class StatusBarController: NSObject {
@@ -38,6 +44,8 @@ class StatusBarController: NSObject {
     private var core: TodoTrayCore!
     private var currentState: AppState?
     private var eventHandler: TodoTrayEventHandler!
+    private var dismissedMeetingEventId: String?
+    private var meetingRefreshTimer: Timer?
     private let logger = OSLog(subsystem: "com.todo-tray.app", category: "StatusBarController")
     
     override init() {
@@ -71,23 +79,40 @@ class StatusBarController: NSObject {
         // Build initial menu
         rebuildMenu()
         os_log("Initial menu built", log: logger, type: .info)
+
+        meetingRefreshTimer = Timer(
+            timeInterval: 30,
+            target: self,
+            selector: #selector(handleMeetingRefreshTimer),
+            userInfo: nil,
+            repeats: true
+        )
+        if let meetingRefreshTimer {
+            RunLoop.main.add(meetingRefreshTimer, forMode: .common)
+        }
         
         os_log("StatusBarController init completed", log: logger, type: .info)
+    }
+
+    deinit {
+        meetingRefreshTimer?.invalidate()
     }
     
     /// Update the state from Rust
     func updateState(_ state: AppState) {
         os_log(
-            "updateState called with %d overdue, %d today, %d linear in progress, %d github notifications, %d calendar events",
+            "updateState called with %d overdue, %d today, %d linear inbox, %d linear in progress, %d github notifications, %d calendar events",
             log: logger,
             type: .info,
             state.overdueCount,
             state.todayCount,
+            state.linearNotificationCount,
             state.inProgressCount,
             state.githubNotificationCount,
             state.calendarEventCount
         )
         currentState = state
+        pruneDismissedMeeting()
         updateMenuBar()
         rebuildMenu()
     }
@@ -113,33 +138,28 @@ class StatusBarController: NSObject {
             statusItem.button?.title = "..."
             return
         }
+
+        if let meeting = currentMeetingFocus() {
+            let title = "\(meeting.event.title) ⋅ \(meeting.titleSuffix)"
+            statusItem.button?.title = title
+            statusItem.button?.toolTip = "Todo Tray - \(meeting.event.title) \(meeting.titleSuffix)"
+            os_log("Menu bar title updated to active meeting: %{public}@", log: logger, type: .info, title)
+            return
+        }
         
         let overdue = Int(state.overdueCount)
         let github = Int(state.githubNotificationCount)
         let today = Int(state.todayCount)
+        let linearInbox = Int(state.linearNotificationCount)
         let linear = Int(state.inProgressCount)
         let calendar = Int(state.calendarEventCount)
         
-        var title: String
-        
-        if overdue > 0 && github > 0 {
-            title = "!\(overdue) + \(github)"
-        } else if overdue > 0 {
-            title = "!\(overdue)"
-        } else if github > 0 {
-            title = "0 + \(github)"
-        } else if today > 0 {
-            title = "\(today)"
-        } else if linear > 0 {
-            title = "L\(linear)"
-        } else if calendar > 0 {
-            title = "C\(calendar)"
-        } else {
-            title = "0"
-        }
+        let todoist = overdue + today
+        let parts = [todoist, linearInbox, github].filter { $0 > 0 }.map(String.init)
+        let title = parts.isEmpty ? (calendar > 0 ? "C\(calendar)" : "0") : parts.joined(separator: " + ")
         
         statusItem.button?.title = title
-        statusItem.button?.toolTip = "Todo Tray - \(overdue) overdue, \(today) today, \(linear) linear in progress, \(github) GitHub notifications, \(calendar) calendar events"
+        statusItem.button?.toolTip = "Todo Tray - \(overdue) overdue, \(today) today, \(linearInbox) linear inbox, \(linear) linear in progress, \(github) GitHub notifications, \(calendar) calendar events"
         os_log("Menu bar title updated to: %{public}@", log: logger, type: .info, title)
     }
     
@@ -154,6 +174,19 @@ class StatusBarController: NSObject {
             menu.addItem(createMenuItem("Quit", action: #selector(quit), keyEquivalent: "q"))
             statusItem.menu = menu
             return
+        }
+
+        if let meeting = currentMeetingFocus() {
+            if let googleMeetUrl = meeting.googleMeetUrl {
+                let item = createMenuItem("Open in Google Meet", action: #selector(openMeetingGoogleMeet))
+                item.representedObject = googleMeetUrl
+                menu.addItem(item)
+            }
+
+            let dismiss = createMenuItem("Dismiss meeting", action: #selector(dismissMeeting))
+            dismiss.representedObject = meeting.event.eventId
+            menu.addItem(dismiss)
+            menu.addItem(.separator())
         }
         
         // Check if we should show tomorrow section (after noon)
@@ -181,6 +214,15 @@ class StatusBarController: NSObject {
         if showTomorrow && !state.tasks.tomorrow.isEmpty {
             menu.addItem(createHeader("Tomorrow"))
             for task in state.tasks.tomorrow {
+                menu.addItem(createTaskItem(task))
+            }
+            menu.addItem(.separator())
+        }
+
+        // Linear inbox section
+        if !state.tasks.linearInbox.isEmpty {
+            menu.addItem(createHeader("Linear · Inbox"))
+            for task in state.tasks.linearInbox {
                 menu.addItem(createTaskItem(task))
             }
             menu.addItem(.separator())
@@ -217,6 +259,7 @@ class StatusBarController: NSObject {
         if state.tasks.overdue.isEmpty
             && state.tasks.today.isEmpty
             && (!showTomorrow || state.tasks.tomorrow.isEmpty)
+            && state.tasks.linearInbox.isEmpty
             && state.tasks.inProgress.isEmpty
             && state.githubNotifications.allSatisfy({ $0.notifications.isEmpty })
             && state.calendarEvents.allSatisfy({ $0.events.isEmpty })
@@ -257,7 +300,7 @@ class StatusBarController: NSObject {
 
         let action: Selector? = if task.canComplete {
             #selector(completeTask(_:))
-        } else if task.source == "linear", task.openUrl != nil {
+        } else if task.source == "linear" || task.source == "linear_inbox", task.openUrl != nil {
             #selector(openLinearTask(_:))
         } else {
             nil
@@ -378,9 +421,11 @@ class StatusBarController: NSObject {
             state.tasks.overdue.removeAll { $0.id == taskId }
             state.tasks.today.removeAll { $0.id == taskId }
             state.tasks.tomorrow.removeAll { $0.id == taskId }
+            state.tasks.linearInbox.removeAll { $0.id == taskId }
             state.tasks.inProgress.removeAll { $0.id == taskId }
             state.overdueCount = UInt32(state.tasks.overdue.count)
             state.todayCount = UInt32(state.tasks.today.count)
+            state.linearNotificationCount = UInt32(state.tasks.linearInbox.count)
             state.inProgressCount = UInt32(state.tasks.inProgress.count)
             currentState = state
             updateMenuBar()
@@ -505,6 +550,34 @@ class StatusBarController: NSObject {
         }
         NSWorkspace.shared.open(url)
     }
+
+    @objc func openMeetingGoogleMeet(_ sender: NSMenuItem) {
+        guard let googleMeetUrl = sender.representedObject as? String else { return }
+        os_log("Open Google Meet URL: %{public}@", log: logger, type: .info, googleMeetUrl)
+
+        statusItem.menu?.cancelTracking()
+
+        guard let url = URL(string: googleMeetUrl) else {
+            showError("Invalid Google Meet URL")
+            return
+        }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc func dismissMeeting(_ sender: NSMenuItem) {
+        guard let eventId = sender.representedObject as? String else { return }
+        dismissedMeetingEventId = eventId
+        os_log("Dismiss meeting focus for event: %{public}@", log: logger, type: .info, eventId)
+        statusItem.menu?.cancelTracking()
+        updateMenuBar()
+        rebuildMenu()
+    }
+
+    @objc private func handleMeetingRefreshTimer() {
+        pruneDismissedMeeting()
+        updateMenuBar()
+        rebuildMenu()
+    }
     
     @objc func toggleAutostart() {
         os_log("Toggle autostart", log: logger, type: .info)
@@ -518,5 +591,101 @@ class StatusBarController: NSObject {
     @objc func quit() {
         os_log("Quit requested", log: logger, type: .info)
         NSApp.terminate(nil)
+    }
+}
+
+private extension StatusBarController {
+    func currentMeetingFocus(referenceDate: Date = Date()) -> MeetingFocusContext? {
+        pruneDismissedMeeting(referenceDate: referenceDate)
+        guard let state = currentState else { return nil }
+
+        let leadSeconds = TimeInterval(state.meetingFocusLeadTimeMinutes) * 60
+        let candidates = state.calendarEvents
+            .flatMap(\.events)
+            .filter { $0.eventId != dismissedMeetingEventId }
+            .compactMap { meetingCandidate(for: $0, referenceDate: referenceDate, leadSeconds: leadSeconds) }
+
+        return candidates.sorted(by: { left, right in
+            if left.isInProgress != right.isInProgress {
+                return left.isInProgress && !right.isInProgress
+            }
+            if left.isInProgress {
+                return left.endDate < right.endDate
+            }
+            return left.startDate < right.startDate
+        }).first?.context
+    }
+
+    func meetingCandidate(
+        for event: CalendarEvent,
+        referenceDate: Date,
+        leadSeconds: TimeInterval
+    ) -> (context: MeetingFocusContext, isInProgress: Bool, startDate: Date, endDate: Date)? {
+        guard
+            let startAt = event.startAt,
+            let endAt = event.endAt,
+            let startDate = ISO8601DateFormatter().date(from: startAt),
+            let endDate = ISO8601DateFormatter().date(from: endAt),
+            endDate > referenceDate
+        else {
+            return nil
+        }
+
+        let isInProgress = referenceDate >= startDate
+        let focusStartsAt = startDate.addingTimeInterval(-leadSeconds)
+        guard referenceDate >= focusStartsAt else { return nil }
+
+        let titleSuffix: String
+        if isInProgress {
+            let minutesLeft = max(1, Int(ceil(endDate.timeIntervalSince(referenceDate) / 60)))
+            titleSuffix = "\(minutesLeft)m left"
+        } else {
+            let minutesUntil = max(1, Int(ceil(startDate.timeIntervalSince(referenceDate) / 60)))
+            titleSuffix = "in \(minutesUntil)m"
+        }
+
+        return (
+            MeetingFocusContext(
+                event: event,
+                titleSuffix: titleSuffix,
+                googleMeetUrl: googleMeetUrl(from: event.openUrl)
+            ),
+            isInProgress,
+            startDate,
+            endDate
+        )
+    }
+
+    func googleMeetUrl(from rawUrl: String?) -> String? {
+        guard
+            let rawUrl,
+            let url = URL(string: rawUrl),
+            let host = url.host?.lowercased()
+        else {
+            return nil
+        }
+
+        return host == "meet.google.com" || host.hasSuffix(".meet.google.com") ? rawUrl : nil
+    }
+
+    func pruneDismissedMeeting(referenceDate: Date = Date()) {
+        guard let dismissedMeetingEventId, let state = currentState else {
+            if currentState == nil {
+                self.dismissedMeetingEventId = nil
+            }
+            return
+        }
+
+        let leadSeconds = TimeInterval(state.meetingFocusLeadTimeMinutes) * 60
+        let isStillDismissed = state.calendarEvents
+            .flatMap(\.events)
+            .contains { event in
+                guard event.eventId == dismissedMeetingEventId else { return false }
+                return meetingCandidate(for: event, referenceDate: referenceDate, leadSeconds: leadSeconds) != nil
+            }
+
+        if !isStillDismissed {
+            self.dismissedMeetingEventId = nil
+        }
     }
 }
